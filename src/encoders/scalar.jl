@@ -399,7 +399,9 @@ function get_first_on_bit(encoder::ScalarEncoder, input::Union{Nothing, Float64}
     end
 end
 
-""" See method description in base.jl """
+""" 
+See method description in base.jl 
+"""
 function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float64})
     if input === nothing || isnan(input) return [nothing] end
     
@@ -415,8 +417,10 @@ function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float6
     return [bucket_idx]
 end
 
-""" See method description in base.py """
-function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64}, output; learn=true)
+""" 
+See method description in base.py 
+"""
+function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64}, output::Array{Float64}; learn=true)
     if input !== nothing && isnan(input) 
         input = nothing 
     end
@@ -424,10 +428,27 @@ function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64
     bucket_idx = get_first_on_bit(encoder, input)
 
     if bucket_idx === nothing
-        output[1:encoder.n] = 0
+        output[1:encoder.n] .= 0
     else
-        output[:self.n] = 0
+        output[1:encoder.n] .= 0
+        minbin = bucket_idx
+        maxbin = minbin + 2*encoder.halfwidth
+        if encoder
+            if maxbin >= encoder.n
+                bottombins = maxbin - encoder.n + 1
+                output[1:bottombins] .= 1
+                maxbin = encoder.n - 1
+            end 
+            if minbin < 0
+                topbins = -minbin
+                output[(encoder.n - topbins + 1):encoder.n] .= 1
+            end
+        end
 
+        @assert(minbin >= 0)
+        @assert(maxbin < encoder.n)
+
+        output[(minbin + 1):(maxbin + 1)] .= 1
     end
 
     if encoder.verbosity >= 2
@@ -447,8 +468,21 @@ function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64
     end
 end
 
-function decode(encoder::ScalarEncoder, encoded; parent_field_name='')
+""" 
+See the function description in base.py
+"""
+function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_name='')
+    
+    # For now, we simply assume any top-down output greater than 0
+    #  is ON. Eventually, we will probably want to incorporate the strength
+    #  of each top-down output.
+    tmp_output = Vector{Float64}( encoded .<= 0 )
+    if !any(x->x>0, tmp_output)
+            return (Dict(), [])
+    end
 
+    max_zeros_in_a_row = encoder.halfwidth
+    
 end
 
 function generate_range_description(encoder::ScalarEncoder)
