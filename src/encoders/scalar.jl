@@ -483,6 +483,8 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
 
     max_zeros_in_a_row = encoder.halfwidth
     
+    ###
+    ###
 end
 
 function generate_range_description(encoder::ScalarEncoder)
