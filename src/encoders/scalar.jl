@@ -481,35 +481,196 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
             return (Dict(), [])
     end
 
+    # ------------------------------------------------------------------------
+    # First, assume the input pool is not sampled 100%, and fill in the
+    #  "holes" in the encoded representation (which are likely to be present
+    #  if this is a coincidence that was learned by the SP).
+
+    # Search for portions of the output that have "holes"
     max_zeros_in_a_row = encoder.halfwidth
-    
-    ###
-    ###
+    for i in 1:max_zeros_in_a_row 
+        search_str = ones(i + 2)
+        search_str[2:i + 1] .= 0
+        sub_len = length(search_str)
+
+        # Does this search string appear in the output?
+        if encoder.periodic
+            for j in 1:encoder.n
+                output_indices = collect(j-1:j+sub_len-2)
+                output_indices .%= encoder.n
+                output_indices .+= 1
+                if search_str == tmp_output[output_indices]
+                    tmp_output[output_indices] .= 1
+                end
+            end
+        else
+            for j in 1:(encoder.n - sub_len + 1)
+                if search_str == tmp_output[j:(j + sub_len)]
+                    tmp_output[j:j + sub_len] .= 1
+                end
+            end
+        end
+    end
+
+    if encoder.verbosity >= 2
+        println(
+            """
+            raw output: $(encoded[1:encoded.n])
+            filtered output: $tmp_output
+            """
+        )
+    end
+
+    # ------------------------------------------------------------------------
+    # Find each run of 1's.
+    nz = findall(x->x>0, tmp_output) 
+    runs = []
+    run = [nz[1], 1]
+    i = 2
+    while i < length(nz)
+        if nz[i] == run[1] + run[2]
+            run[2] += 1
+        else 
+            runs.push(run)
+            run = [nz[i], 1]
+        end
+        i += 1
+    end
+    runs.push(run)
+
+    # If we have a periodic encoder, merge the first and last run if they
+    #  both go all the way to the edges
+    if encoder.periodic && length(runs) > 1
+        if runs[1][1] == 0 && runs[lastindex(runs)][1] + runs[lastindex(runs)][2] == encoder.n
+            runs[lastindex(runs)][2] += runs[1][2]
+            runs = runs[2:lastindex(runs)]
+        end
+    end
+
+    # ------------------------------------------------------------------------
+    # Now, for each group of 1's, determine the "left" and "right" edges, where
+    #  the "left" edge is inset by halfwidth and the "right" edge is inset by
+    #  halfwidth.
+    # For a group of width w or less, the "left" and "right" edge are both at
+    #   the center position of the group.
+    ranges = []
+    for run in runs
+        (start, run_len) = run
+        if run_len < encoder.w
+            left = right = start + run_len/2
+        else
+            left = start + encoder.halfwidth
+            right = start + run_len - 1 - encoder.halfwidth
+        end
+
+        # Convert to input space.
+        if !encoder.periodic
+            in_min = (left - encoder.padding) * encoder.resolution + encoder.minval
+            in_max = (right - encoder.padding) * encoder.resolution + encoder.minval
+        else
+            in_min = (left - encoder.padding) * encoder.range / encoder.n_internal + encoder.minval
+            in_max = (right - encoder.padding) * encoder.range / encoder.n_internal + encoder.minval
+        end
+        # Handle wrap-around if periodic
+        if encoder.periodic
+            if in_min >= encoder.maxval
+                in_min -= encoder.range
+                in_max -= encoder.range
+            end
+        end
+
+        # Clip low end
+        if in_min < encoder.minval
+            in_min = encoder.minval
+        end
+        if in_max < encoder.minval
+            in_max = encoder.minval
+        end
+
+        # If we have a periodic encoder, and the max is past the edge, break into
+        #  2 separate ranges
+        if encoder.periodic && in_max >= encoder.maxval
+            push!(ranges, [in_min, encoder.maxval])
+            push!(ranges, [encoder.minval, in_max = encoder.range])
+        else
+            if in_max > encoder.maxval
+                in_max = encoder.maxval
+            end
+            if in_min > encoder.maxval
+                in_min = encoder.maxval
+            end
+            push!(ranges, [in_min, in_max])
+        end
+    end
+
+    desc = generate_range_description(encoder, ranges)
+    # Return result
+    if parent_field_name != ""
+        field_name = "$parent_field_name.$(encoder.name)"
+    else
+        field_name = encoder.name
+    end
+
+    return (Dict(field_name => (ranges, desc)), [field_name])
 end
 
-function generate_range_description(encoder::ScalarEncoder)
-
+"""
+generate description from a text description of the ranges
+"""
+function generate_range_description(encoder::ScalarEncoder, ranges)
+    desc = ""
+    num_ranges = length(ranges)
+    for i in 1:num_ranges
+        if ranges[i][1] != ranges[i][2]
+            desc *= @sprintf("%.2f-%.2f", ranges[i][1], ranges[i][2])
+        else
+            desc *= @sprintf("%.2f", ranges[i][1])
+        end
+        if i < num_ranges - 1
+            desc *= ","
+        end
+    end
+    return desc
 end
 
+""" 
+Return the interal _topDownMappingM matrix used for handling the
+bucketInfo() and topDownCompute() methods. This is a matrix, one row per
+category (bucket) where each row contains the encoded output for that
+category.
+"""
 function get_top_down_mapping(encoder::ScalarEncoder)
 
 end
 
+""" 
+See the function description in base.py
+"""
 function get_bucket_values(encoder::ScalarEncoder)
 
 end
 
+""" 
+See the function description in base.py 
+"""
 function get_bucket_info(encoder::ScalarEncoder, buckets)
 
 end
 
+""" 
+See the function description in base.py
+"""
 function top_down_compute(encoder::ScalarEncoder, encoded)
 
 end
 
+""" 
+See the function description in base.py
+"""
 function closeness_scores(encoder::ScalarEncoder, exp_values, act_values; fractional=true)
 
 end
+
 
 function Base.show(io::IO, encoder::ScalarEncoder)
     string = 
