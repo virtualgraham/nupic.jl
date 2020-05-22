@@ -14,18 +14,18 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
     minval::Union{Float64, Nothing}
     maxval::Union{Float64, Nothing}
     periodic::Bool
-    n
-    radius
-    resolution
+    n::Integer
+    radius::Float64
+    resolution::Float64
     name::String
-    verbosity
+    verbosity::Integer
     clip_input::Bool
 
     encoders
-    halfwidth
+    halfwidth::Integer
     range
     range_internal::Float64
-    n_internal
+    n_internal::Integer
     _top_down_mapping_m
     _top_down_values
     _bucket_values
@@ -36,8 +36,8 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
 
     function ScalarEncoder(
         w::Integer,
-        minval::Union{Float64, Nothing},
-        maxval::Union{Float64, Nothing};
+        minval::Union{Number, Nothing},
+        maxval::Union{Number, Nothing};
         periodic::Bool=false,
         n=0,
         radius=DEFAULT_RADIUS,
@@ -53,7 +53,7 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
         end
 
         encoders = nothing
-        halfwidth = (w-1)/2
+        halfwidth = Integer((w-1)/2)
         range = 0
         range_internal = 0
        
@@ -83,7 +83,7 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             end
             @assert( n > w )
 
-            if minval !== nothing && maxval != nothing
+            if minval !== nothing && maxval !== nothing
                 if !periodic
                     resolution = range_internal / (n - w)
                 else
@@ -110,7 +110,7 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
                 error("One of n, radius, resolution must be specified for a ScalarEncoder")
             end
 
-            if minval !== nothing & maxval !== nothing
+            if minval !== nothing && maxval !== nothing
                 if periodic
                     range = range_internal
                 else
@@ -206,7 +206,7 @@ function get_width(encoder::ScalarEncoder)
 end
 
 
-function recalc_params!(encoder::ScalarEncoder)
+function _recalc_params!(encoder::ScalarEncoder)
     encoder.range_internal = encoder.maxval = encoder.minval
 
     if !encoder.periodic
@@ -230,7 +230,7 @@ function get_description(encoder::ScalarEncoder)
 end
 
 
-function get_first_on_bit(encoder::ScalarEncoder, input::Union{Nothing, Float64})
+function _get_first_on_bit(encoder::ScalarEncoder, input)
     if input === nothing
         return nothing
     else
@@ -263,10 +263,10 @@ function get_first_on_bit(encoder::ScalarEncoder, input::Union{Nothing, Float64}
             end
         end
 
-        if encoder.periodic
-            centerbin = ((input - encoder.minval) * encoder.n_internal / encoder.range) + encoder.padding
+        centerbin::Integer = if encoder.periodic
+            Integer(floor((input - encoder.minval) * encoder.n_internal / encoder.range) + encoder.padding)
         else
-            centerbin = (((input - encoder.minval) * encoder.resolution/2) / encoder.resolution) + encoder.padding
+            Integer(floor(((input - encoder.minval) * encoder.resolution/2) / encoder.resolution) + encoder.padding)
         end
 
         minbin = centerbin - encoder.halfwidth;
@@ -278,7 +278,7 @@ end
 function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float64})
     if input === nothing || isnan(input) return [nothing] end
     
-    minbin = get_first_on_bit(encoder, input)
+    minbin = _get_first_on_bit(encoder, input)
 
     if encoder.periodic
         bucket_idx = minbin + encoder.halfwidth
@@ -291,12 +291,12 @@ function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float6
 end
 
 
-function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64}, output::Array{Float64}; learn=true)
+function encode_into_array(encoder::ScalarEncoder, input, output::BitArray; learn::Bool=true)
     if input !== nothing && isnan(input) 
         input = nothing 
     end
 
-    bucket_idx = get_first_on_bit(encoder, input)
+    bucket_idx = _get_first_on_bit(encoder, input)
 
     if bucket_idx === nothing
         output[1:encoder.n] .= 0
@@ -304,7 +304,7 @@ function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64
         output[1:encoder.n] .= 0
         minbin = bucket_idx
         maxbin = minbin + 2*encoder.halfwidth
-        if encoder
+        if encoder.periodic
             if maxbin >= encoder.n
                 bottombins = maxbin - encoder.n + 1
                 output[1:bottombins] .= 1
@@ -313,6 +313,7 @@ function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64
             if minbin < 0
                 topbins = -minbin
                 output[(encoder.n - topbins + 1):encoder.n] .= 1
+                minbin = 0
             end
         end
 
@@ -340,23 +341,47 @@ function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64
 end
 
 
-function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_name='')
-    tmp_output = Vector{Float64}( encoded .<= 0 )
+function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_name="")
+    tmp_output = BitArray( encoded .<= 0 )
+
     if !any(x->x>0, tmp_output)
-            return (Dict(), [])
+        return Dict(), []
     end
 
+    if encoder.verbosity >= 2
+        println("raw output: $(encoded[1:encoder.n])")
+    end
+
+    return _decode(encoder, tmp_output; parent_field_name=parent_field_name)
+end
+
+
+function decode(encoder::ScalarEncoder, encoded::BitArray; parent_field_name="")
+    if !any(x->x>0, encoded)
+        return Dict(), []
+    end
+
+    tmp_output = copy(encoded)
+
+    if encoder.verbosity >= 2
+        println("raw output: $(encoded[1:encoder.n])")
+    end
+    
+    return _decode(encoder, tmp_output; parent_field_name=parent_field_name)
+end
+
+
+function _decode(encoder::ScalarEncoder, tmp_output::BitArray; parent_field_name="")
     max_zeros_in_a_row = encoder.halfwidth
     for i in 1:max_zeros_in_a_row 
-        search_str = ones(i + 2)
-        search_str[2:i + 1] .= 0
+        search_str = ones(i + 3)
+        search_str[2:i + 2] .= 0
         sub_len = length(search_str)
 
         if encoder.periodic
             for j in 1:encoder.n
-                output_indices = collect(j-1:j+sub_len-2)
-                output_indices .%= encoder.n
-                output_indices .+= 1
+                output_indices = collect(j+1:j+sub_len)
+                output_indices = map(x -> (x-1) % encoder.n + 1, output_indices)
                 if search_str == tmp_output[output_indices]
                     tmp_output[output_indices] .= 1
                 end
@@ -371,28 +396,23 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
     end
 
     if encoder.verbosity >= 2
-        println(
-            """
-            raw output: $(encoded[1:encoded.n])
-            filtered output: $tmp_output
-            """
-        )
+        println("filtered output: $tmp_output")
     end
 
     nz = findall(x->x>0, tmp_output) 
     runs = []
-    run = [nz[1], 1]
+    run = [nz[1]-1, 1]
     i = 2
-    while i < length(nz)
-        if nz[i] == run[1] + run[2]
+    while i <= length(nz)
+        if nz[i] - 1 == run[1] + run[2]
             run[2] += 1
         else 
-            runs.push(run)
-            run = [nz[i], 1]
+            push!(runs, run)
+            run = [nz[i] - 1, 1]
         end
         i += 1
     end
-    runs.push(run)
+    push!(runs, run)
 
     if encoder.periodic && length(runs) > 1
         if runs[1][1] == 0 && runs[lastindex(runs)][1] + runs[lastindex(runs)][2] == encoder.n
@@ -404,7 +424,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
     ranges = []
     for run in runs
         (start, run_len) = run
-        if run_len < encoder.w
+        if run_len <= encoder.w
             left = right = start + run_len/2
         else
             left = start + encoder.halfwidth
@@ -435,7 +455,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
 
         if encoder.periodic && in_max >= encoder.maxval
             push!(ranges, [in_min, encoder.maxval])
-            push!(ranges, [encoder.minval, in_max = encoder.range])
+            push!(ranges, [encoder.minval, in_max - encoder.range])
         else
             if in_max > encoder.maxval
                 in_max = encoder.maxval
@@ -447,7 +467,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
         end
     end
 
-    desc = generate_range_description(encoder, ranges)
+    desc = _generate_range_description(encoder, ranges)
 
     if parent_field_name != ""
         field_name = "$parent_field_name.$(encoder.name)"
@@ -459,7 +479,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
 end
 
 
-function generate_range_description(encoder::ScalarEncoder, ranges)
+function _generate_range_description(encoder::ScalarEncoder, ranges)
     desc = ""
     num_ranges = length(ranges)
     for i in 1:num_ranges
@@ -476,7 +496,7 @@ function generate_range_description(encoder::ScalarEncoder, ranges)
 end
 
 
-function get_top_down_mapping!(encoder::ScalarEncoder)
+function _get_top_down_mapping!(encoder::ScalarEncoder)
     # Do we need to build up our reverse mapping table?
     if encoder._top_down_mapping_m === nothing
         if encoder.periodic
@@ -504,7 +524,7 @@ end
 
 function get_bucket_values(encoder::ScalarEncoder)
     if encoder._bucket_values === nothing
-        top_down_mapping_m = get_top_down_mapping!(encoder)
+        top_down_mapping_m = _get_top_down_mapping!(encoder)
         num_buckets = size(top_down_mapping_m, 1)
         encoder._bucket_values = []
         for bucket_idx in 1:num_buckets
@@ -517,7 +537,7 @@ end
 
 
 function get_bucket_info(encoder::ScalarEncoder, buckets)
-    top_down_mapping_m = get_top_down_mapping!(encoder)
+    top_down_mapping_m = _get_top_down_mapping!(encoder)
 
     category = buckets[0]
     encoding = encoder._top_down_mapping_m[category,:]
@@ -533,7 +553,7 @@ end
 
 
 function top_down_compute(encoder::ScalarEncoder, encoded)
-    top_down_mapping_m = get_top_down_mapping!(encoder)
+    top_down_mapping_m = _get_top_down_mapping!(encoder)
 
     category = argmax(top_down_mapping_m * encoded)
 
@@ -563,10 +583,21 @@ function closeness_scores(encoder::ScalarEncoder, exp_values, act_values; fracti
     return [closeness]
 end
 
+function Base.:(==)(x::ScalarEncoder, y::ScalarEncoder)
+    return x.minval == y.minval &&
+    x.maxval == y.maxval &&
+    x.w == y.w &&
+    x.n == y.n &&
+    x.resolution == y.resolution &&
+    x.radius == y.radius &&
+    x.periodic == y.periodic &&
+    x.n_internal == y.n_internal &&
+    x.range_internal == y.range_internal &&
+    x.padding == y.padding
+end
 
 function Base.show(io::IO, encoder::ScalarEncoder)
-    string = 
-    println(
+    println(io,
         """
         ScalarEncoder:
         min: $(encoder.minval)

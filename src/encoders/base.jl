@@ -2,8 +2,6 @@ using Printf
 
 abstract type Encoder end
 
-InputData = Union{Dict,Vector}
-
 
 function get_encoders(encoder::Encoder)
     error("Encoder method get_encoders not implemented")
@@ -40,7 +38,7 @@ function get_width(encoder::Encoder)
 end
 
 
-function encode_into_array(encoder::Encoder, input_data::InputData, output::Array{Int8})
+function encode_into_array(encoder::Encoder, input_data, output::BitArray; learn=true)
     error("Encoder method encode_into_array not implemented")
 end
 
@@ -55,8 +53,8 @@ function set_field_stats(encoder::Encoder)
 end
 
 
-function encode(encoder::Encoder, input_data::InputData)
-    output = zeros(UInt8, get_width(encoder))
+function encode(encoder::Encoder, input_data)
+    output = BitArray(undef, get_width(encoder))
     encode_into_array(encoder, input_data, output)
     return output
 end
@@ -144,7 +142,7 @@ function get_encoder_list(encoder::Encoder)
 end
 
 
-function get_scalars(encoder::Encoder, input_data::InputData)
+function get_scalars(encoder::Encoder, input_data)
     encoders = get_encoders(encoder)
 
     if encoders !== nothing
@@ -163,7 +161,7 @@ function get_scalars(encoder::Encoder, input_data::InputData)
 end
 
 
-function get_encoded_values(encoder::Encoder, input_data::InputData)
+function get_encoded_values(encoder::Encoder, input_data)
     ret_vals = []
 
     encoders = get_encoders(encoder)
@@ -189,7 +187,7 @@ function get_encoded_values(encoder::Encoder, input_data::InputData)
 end
 
 
-function get_bucket_indices(encoder::Encoder, input_data::InputData)
+function get_bucket_indices(encoder::Encoder, input_data)
     ret_vals = []
     encoders = get_encoders(encoder)
     if encoders !== nothing
