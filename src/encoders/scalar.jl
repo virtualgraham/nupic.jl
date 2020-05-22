@@ -1,4 +1,6 @@
 using Printf
+using SparseArrays
+
 import Base.show
 
 abstract type AbstractScalarEncoder <: Encoder end
@@ -6,151 +8,8 @@ abstract type AbstractScalarEncoder <: Encoder end
 const DEFAULT_RESOLUTION = 0
 const DEFAULT_RADIUS = 0
 
-"""
-A scalar encoder encodes a numeric (floating point) value into an array
-of bits. The output is 0's except for a contiguous block of 1's. The
-location of this contiguous block varies continuously with the input value.
 
-The encoding is linear. If you want a nonlinear encoding, just transform
-the scalar (e.g. by applying a logarithm function) before encoding.
-It is not recommended to bin the data as a pre-processing step, e.g.
-"1" = $0 - $.20, "2" = $.21-$0.80, "3" = $.81-$1.20, etc. as this
-removes a lot of information and prevents nearby values from overlapping
-in the output. Instead, use a continuous transformation that scales
-the data (a piecewise transformation is fine).
-
-.. warning:: There are three mutually exclusive parameters that determine the
-   overall size of of the output. Exactly one of n, radius, resolution must be
-   set. "0" is a special value that means "not set".
-
-:param w: The number of bits that are set to encode a single value - the
-          "width" of the output signal restriction: w must be odd to avoid
-          centering problems.
-
-:param minval: The minimum value of the input signal.
-
-:param maxval: The upper bound of the input signal. (input is strictly less if
-            ``periodic == True``)
-
-:param periodic: If true, then the input value "wraps around" such that
-            ``minval`` = ``maxval``. For a periodic value, the input must be
-            strictly less than ``maxval``, otherwise ``maxval`` is a true
-            upper bound.
-
-:param n: The number of bits in the output. Must be greater than or equal to
-          ``w``
-
-:param radius: Two inputs separated by more than the radius have
-               non-overlapping representations. Two inputs separated by less
-               than the radius will in general overlap in at least some of
-               their bits. You can think of this as the radius of the input.
-
-:param resolution: Two inputs separated by greater than, or equal to the
-                   resolution are guaranteed to have different
-                   representations.
-
-:param name: an optional string which will become part of the description
-
-:param clipInput: if true, non-periodic inputs smaller than minval or greater
-          than maxval will be clipped to minval/maxval
-
-:param forced: if true, skip some safety checks (for compatibility reasons),
-               default false
-
-.. note:: ``radius`` and ``resolution`` are specified with respect to the
-   input, not output. ``w`` is specified with respect to the output.
-
-**Example: day of week**
-
-.. code-block:: text
-
-   w = 3
-   Minval = 1 (Monday)
-   Maxval = 8 (Monday)
-   periodic = true
-   n = 14
-   [equivalently: radius = 1.5 or resolution = 0.5]
-
-The following values would encode midnight -- the start of the day
-
-.. code-block:: text
-
-   monday (1)   -> 11000000000001
-   tuesday(2)   -> 01110000000000
-   wednesday(3) -> 00011100000000
-   ...
-   sunday (7)   -> 10000000000011
-
-Since the resolution is 12 hours, we can also encode noon, as
-
-.. code-block:: text
-
-   monday noon  -> 11100000000000
-   monday midnt-> 01110000000000
-   tuesday noon -> 00111000000000
-   etc.
-
-**`n` vs `resolution`**
-
-It may not be natural to specify "n", especially with non-periodic
-data. For example, consider encoding an input with a range of 1-10
-(inclusive) using an output width of 5.  If you specify resolution =
-1, this means that inputs of 1 and 2 have different outputs, though
-they overlap, but 1 and 1.5 might not have different outputs.
-This leads to a 14-bit representation like this:
-
-.. code-block:: text
-
-   1 ->  11111000000000  (14 bits total)
-   2 ->  01111100000000
-   ...
-   10->  00000000011111
-   [resolution = 1; n=14; radius = 5]
-
-You could specify resolution = 0.5, which gives
-
-.. code-block:: text
-
-   1   -> 11111000... (22 bits total)
-   1.5 -> 011111.....
-   2.0 -> 0011111....
-   [resolution = 0.5; n=22; radius=2.5]
-
-You could specify radius = 1, which gives
-
-.. code-block:: text
-
-   1   -> 111110000000....  (50 bits total)
-   2   -> 000001111100....
-   3   -> 000000000011111...
-   ...
-   10  ->                           .....000011111
-   [radius = 1; resolution = 0.2; n=50]
-
-An N/M encoding can also be used to encode a binary value,
-where we want more than one bit to represent each state.
-For example, we could have: w = 5, minval = 0, maxval = 1,
-radius = 1 (which is equivalent to n=10)
-
-.. code-block:: text
-
-   0 -> 1111100000
-   1 -> 0000011111
-
-
-**Implementation details**
-
-.. code-block:: text
-
-   range = maxval - minval
-   h = (w-1)/2  (half-width)
-   resolution = radius / w
-   n = w * range/radius (periodic)
-   n = w * range/radius + 2 * h (non-periodic)
-
-"""
 mutable struct ScalarEncoder <: AbstractScalarEncoder
-
     w::Integer
     minval::Union{Float64, Nothing}
     maxval::Union{Float64, Nothing}
@@ -171,6 +30,9 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
     _top_down_values
     _bucket_values
     padding
+    
+    flattened_field_type_list
+    flattened_encoder_list
 
     function ScalarEncoder(
         w::Integer,
@@ -195,19 +57,11 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
         range = 0
         range_internal = 0
        
-        # This matrix is used for the topDownCompute. We build it the first time
-        #  topDownCompute is called
         _top_down_mapping_m = nothing
         _top_down_values = nothing
 
-        # This list is created by getBucketValues() the first time it is called,
-        #  and re-created whenever our buckets would be re-arranged.
         _bucket_values = nothing
 
-        # For non-periodic inputs, padding is the number of bits "outside" the range,
-        # on each side. I.e. the representation of minval is centered on some bit, and
-        # there are "padding" bits to the left of that centered bit; similarly with
-        # bits to the right of the center bit of maxval
         padding = if periodic 0 else halfwidth end
 
         n_internal = n - 2 * padding
@@ -223,8 +77,6 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             range_internal = maxval - minval
         end
 
-        # There are three different ways of thinking about the representation. Handle
-        # each case here.
         if n != 0
             if radius != 0 || resolution != 0
                 error("Only one of n/radius/resolution can be specified for a ScalarEncoder")
@@ -270,20 +122,15 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             end
         end
 
-        # nInternal represents the output area excluding the possible padding on each
-        #  side
         if minval !== nothing && maxval !== nothing
             n_internal = n - 2 * padding
         end
 
-        # Our name
         if name === nothing
             name = "[$minval:$maxval]"
         end
 
-        # checks for likely mistakes in encoder settings
         if !forced 
-             # check reasonable settings
             if w < 21
                 error(
                     "Number of bits in the SDR ($w) must be >= 21 (use "
@@ -311,18 +158,53 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             _top_down_mapping_m,
             _top_down_values,
             _bucket_values,
-            padding
+            padding,
+            nothing,
+            nothing
         )
     end
 end
+
+
+function get_encoders(encoder::ScalarEncoder)
+    return encoder.encoders
+end
+
+
+function get_name(encoder::ScalarEncoder)
+    return encoder.name
+end
+
+
+function get_flattened_field_type_list(encoder::ScalarEncoder)
+    return encoder.flattened_field_type_list
+end
+
+
+function set_flattened_field_type_list(encoder::ScalarEncoder, field_types)
+    encoder.flattened_field_type_list = field_types
+end
+
+
+function get_flattened_encoder_list(encoder::ScalarEncoder)
+    return encoder.flattened_encoder_list
+end
+
+
+function set_flattened_encoder_list(encoder::ScalarEncoder, encoders)
+    encoder.flattened_encoder_list = encoders
+end
+
 
 function get_decoder_output_field_types(encoder::ScalarEncoder)
     (Float64,)
 end
 
+
 function get_width(encoder::ScalarEncoder)
     encoder.n
 end
+
 
 function recalc_params!(encoder::ScalarEncoder)
     encoder.range_internal = encoder.maxval = encoder.minval
@@ -347,18 +229,13 @@ function get_description(encoder::ScalarEncoder)
     [(encoder.name, 0)]
 end
 
-""" 
-Return the bit offset of the first bit to be set in the encoder output.
-For periodic encoders, this can be a negative number when the encoded output
-wraps around. 
-"""
+
 function get_first_on_bit(encoder::ScalarEncoder, input::Union{Nothing, Float64})
     if input === nothing
         return nothing
     else
 
         if input < encoder.minval
-             # Don't clip periodic inputs. Out-of-range input is always an error
             if encoder.clip_input && !encoder.periodic
                 if encoder.verbosity > 0
                     @printf("Clipped input %s=%.2f to minval %.2f", encoder.name, input, encoder.minval)
@@ -370,7 +247,6 @@ function get_first_on_bit(encoder::ScalarEncoder, input::Union{Nothing, Float64}
         end
 
         if encoder.periodic
-             # Don't clip periodic inputs. Out-of-range input is always an error
             if input >= encoder.maxval
                 error("input ($input) greater than periodic range ($(encoder.minval) - $(encoder.maxval))")
             end
@@ -393,15 +269,12 @@ function get_first_on_bit(encoder::ScalarEncoder, input::Union{Nothing, Float64}
             centerbin = (((input - encoder.minval) * encoder.resolution/2) / encoder.resolution) + encoder.padding
         end
 
-        # We use the first bit to be set in the encoded output as the bucket index
         minbin = centerbin - encoder.halfwidth;
         return minbin
     end
 end
 
-""" 
-See method description in base.jl 
-"""
+
 function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float64})
     if input === nothing || isnan(input) return [nothing] end
     
@@ -417,9 +290,7 @@ function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float6
     return [bucket_idx]
 end
 
-""" 
-See method description in base.py 
-"""
+
 function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64}, output::Array{Float64}; learn=true)
     if input !== nothing && isnan(input) 
         input = nothing 
@@ -468,32 +339,19 @@ function encode_into_array(encoder::ScalarEncoder, input::Union{nothing, Float64
     end
 end
 
-""" 
-See the function description in base.py
-"""
+
 function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_name='')
-    
-    # For now, we simply assume any top-down output greater than 0
-    #  is ON. Eventually, we will probably want to incorporate the strength
-    #  of each top-down output.
     tmp_output = Vector{Float64}( encoded .<= 0 )
     if !any(x->x>0, tmp_output)
             return (Dict(), [])
     end
 
-    # ------------------------------------------------------------------------
-    # First, assume the input pool is not sampled 100%, and fill in the
-    #  "holes" in the encoded representation (which are likely to be present
-    #  if this is a coincidence that was learned by the SP).
-
-    # Search for portions of the output that have "holes"
     max_zeros_in_a_row = encoder.halfwidth
     for i in 1:max_zeros_in_a_row 
         search_str = ones(i + 2)
         search_str[2:i + 1] .= 0
         sub_len = length(search_str)
 
-        # Does this search string appear in the output?
         if encoder.periodic
             for j in 1:encoder.n
                 output_indices = collect(j-1:j+sub_len-2)
@@ -521,8 +379,6 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
         )
     end
 
-    # ------------------------------------------------------------------------
-    # Find each run of 1's.
     nz = findall(x->x>0, tmp_output) 
     runs = []
     run = [nz[1], 1]
@@ -538,8 +394,6 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
     end
     runs.push(run)
 
-    # If we have a periodic encoder, merge the first and last run if they
-    #  both go all the way to the edges
     if encoder.periodic && length(runs) > 1
         if runs[1][1] == 0 && runs[lastindex(runs)][1] + runs[lastindex(runs)][2] == encoder.n
             runs[lastindex(runs)][2] += runs[1][2]
@@ -547,12 +401,6 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
         end
     end
 
-    # ------------------------------------------------------------------------
-    # Now, for each group of 1's, determine the "left" and "right" edges, where
-    #  the "left" edge is inset by halfwidth and the "right" edge is inset by
-    #  halfwidth.
-    # For a group of width w or less, the "left" and "right" edge are both at
-    #   the center position of the group.
     ranges = []
     for run in runs
         (start, run_len) = run
@@ -563,7 +411,6 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
             right = start + run_len - 1 - encoder.halfwidth
         end
 
-        # Convert to input space.
         if !encoder.periodic
             in_min = (left - encoder.padding) * encoder.resolution + encoder.minval
             in_max = (right - encoder.padding) * encoder.resolution + encoder.minval
@@ -571,7 +418,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
             in_min = (left - encoder.padding) * encoder.range / encoder.n_internal + encoder.minval
             in_max = (right - encoder.padding) * encoder.range / encoder.n_internal + encoder.minval
         end
-        # Handle wrap-around if periodic
+
         if encoder.periodic
             if in_min >= encoder.maxval
                 in_min -= encoder.range
@@ -579,7 +426,6 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
             end
         end
 
-        # Clip low end
         if in_min < encoder.minval
             in_min = encoder.minval
         end
@@ -587,8 +433,6 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
             in_max = encoder.minval
         end
 
-        # If we have a periodic encoder, and the max is past the edge, break into
-        #  2 separate ranges
         if encoder.periodic && in_max >= encoder.maxval
             push!(ranges, [in_min, encoder.maxval])
             push!(ranges, [encoder.minval, in_max = encoder.range])
@@ -604,7 +448,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
     end
 
     desc = generate_range_description(encoder, ranges)
-    # Return result
+
     if parent_field_name != ""
         field_name = "$parent_field_name.$(encoder.name)"
     else
@@ -614,9 +458,7 @@ function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_n
     return (Dict(field_name => (ranges, desc)), [field_name])
 end
 
-"""
-generate description from a text description of the ranges
-"""
+
 function generate_range_description(encoder::ScalarEncoder, ranges)
     desc = ""
     num_ranges = length(ranges)
@@ -633,42 +475,92 @@ function generate_range_description(encoder::ScalarEncoder, ranges)
     return desc
 end
 
-""" 
-Return the interal _topDownMappingM matrix used for handling the
-bucketInfo() and topDownCompute() methods. This is a matrix, one row per
-category (bucket) where each row contains the encoded output for that
-category.
-"""
-function get_top_down_mapping(encoder::ScalarEncoder)
 
+function get_top_down_mapping!(encoder::ScalarEncoder)
+    # Do we need to build up our reverse mapping table?
+    if encoder._top_down_mapping_m === nothing
+        if encoder.periodic
+            encoder._top_down_values = collect((encoder.minval + encoder.resolution / 2.0) : encoder.resolution : encoder.maxval)
+        else
+            encoder._top_down_values = collect(encoder.minval : encoder.resolution : (encoder.maxval + encoder.resolution / 2.0))
+        end
+        
+        num_categories = length(encoder._top_down_values)
+        encoder._top_down_mapping_m = spzeros(num_categories, encoder.n)
+
+        output_space = zeros(Int64, encoder.n)
+        for i in 1:num_categories 
+            value = encoder._top_down_values[i]
+            value = max(value, encoder.minval)
+            value = min(value, encoder.maxval)
+            encode_into_array(encoder, value, output_space; learn=false)
+            encoder._top_down_mapping_m[i,:] = output_space
+        end
+    end
+
+    return encoder._top_down_mapping_m
 end
 
-""" 
-See the function description in base.py
-"""
+
 function get_bucket_values(encoder::ScalarEncoder)
+    if encoder._bucket_values === nothing
+        top_down_mapping_m = get_top_down_mapping!(encoder)
+        num_buckets = size(top_down_mapping_m, 1)
+        encoder._bucket_values = []
+        for bucket_idx in 1:num_buckets
+            push!(encoder._bucket_values, get_bucket_info(encoder, [bucket_idx])[0].value)
+        end
+    end
 
+    return encoder._bucket_values
 end
 
-""" 
-See the function description in base.py 
-"""
+
 function get_bucket_info(encoder::ScalarEncoder, buckets)
+    top_down_mapping_m = get_top_down_mapping!(encoder)
 
+    category = buckets[0]
+    encoding = encoder._top_down_mapping_m[category,:]
+
+    if encoder.periodic
+        input_val = (encoder.minval + (encoder.resolution / 2.0) + (category * encoder.resolution))
+    else
+        inputVal = encoder.minval + (category * encoder.resolution)
+    end
+    
+    return [(value=inputVal, scalar=inputVal, encoding=encoding)]
 end
 
-""" 
-See the function description in base.py
-"""
+
 function top_down_compute(encoder::ScalarEncoder, encoded)
+    top_down_mapping_m = get_top_down_mapping!(encoder)
 
+    category = argmax(top_down_mapping_m * encoded)
+
+    return get_bucket_info(encoded, [category])
 end
 
-""" 
-See the function description in base.py
-"""
-function closeness_scores(encoder::ScalarEncoder, exp_values, act_values; fractional=true)
 
+function closeness_scores(encoder::ScalarEncoder, exp_values, act_values; fractional=true)
+    exp_value = exp_values[1]
+    act_value = act_values[1]
+    if encoder.periodic
+        exp_value = exp_value % encoder.maxval
+        act_value = act_value % encoder.maxval
+    end
+
+    err = abs(exp_value - act_value)
+    if encoder.periodic
+        err = min(err, encoder.maxval - err)
+    end
+    if fractional
+        pct_err = err / (encoder.maxval - encoder.minval)
+        pct_err = min(1.0, pct_err)
+    else
+        closeness = err
+    end
+
+    return [closeness]
 end
 
 
