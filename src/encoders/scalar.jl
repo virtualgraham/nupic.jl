@@ -171,23 +171,23 @@ get_width(encoder::AbstractScalarEncoder) = encoder.n
 get_description(encoder::AbstractScalarEncoder) = [(encoder.name, 0)]
 
 
-function _recalc_params!(encoder::AbstractScalarEncoder)
-    encoder.range_internal = encoder.maxval = encoder.minval
+# function _recalc_params!(encoder::AbstractScalarEncoder)
+#     encoder.range_internal = encoder.maxval = encoder.minval
 
-    if !encoder.periodic
-        encoder.resolution = encoder.range_internal / (encoder.n - encoder.w)
-    else
-        encoder.resolution = encoder.range_internal / encoder.n
-    end
+#     if !encoder.periodic
+#         encoder.resolution = encoder.range_internal / (encoder.n - encoder.w)
+#     else
+#         encoder.resolution = encoder.range_internal / encoder.n
+#     end
 
-    encoder.radius = encoder.w * encoder.resolution
+#     encoder.radius = encoder.w * encoder.resolution
 
-    if encoder.periodic
-        encoder.range = encoder.range_internal
-    else
-        encoder.range = encoder.range_internal + encoder.resolution
-    end
-end
+#     if encoder.periodic
+#         encoder.range = encoder.range_internal
+#     else
+#         encoder.range = encoder.range_internal + encoder.resolution
+#     end
+# end
 
 
 function _get_first_on_bit(encoder::AbstractScalarEncoder, input)
