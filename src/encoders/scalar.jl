@@ -166,47 +166,12 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
 end
 
 
-function get_encoders(encoder::ScalarEncoder)
-    return encoder.encoders
-end
+get_decoder_output_field_types(encoder::AbstractScalarEncoder) = (Float64,)
+get_width(encoder::AbstractScalarEncoder) = encoder.n
+get_description(encoder::AbstractScalarEncoder) = [(encoder.name, 0)]
 
 
-function get_name(encoder::ScalarEncoder)
-    return encoder.name
-end
-
-
-function get_flattened_field_type_list(encoder::ScalarEncoder)
-    return encoder.flattened_field_type_list
-end
-
-
-function set_flattened_field_type_list(encoder::ScalarEncoder, field_types)
-    encoder.flattened_field_type_list = field_types
-end
-
-
-function get_flattened_encoder_list(encoder::ScalarEncoder)
-    return encoder.flattened_encoder_list
-end
-
-
-function set_flattened_encoder_list(encoder::ScalarEncoder, encoders)
-    encoder.flattened_encoder_list = encoders
-end
-
-
-function get_decoder_output_field_types(encoder::ScalarEncoder)
-    (Float64,)
-end
-
-
-function get_width(encoder::ScalarEncoder)
-    encoder.n
-end
-
-
-function _recalc_params!(encoder::ScalarEncoder)
+function _recalc_params!(encoder::AbstractScalarEncoder)
     encoder.range_internal = encoder.maxval = encoder.minval
 
     if !encoder.periodic
@@ -225,12 +190,10 @@ function _recalc_params!(encoder::ScalarEncoder)
 end
 
 
-function get_description(encoder::ScalarEncoder)
-    [(encoder.name, 0)]
-end
 
 
-function _get_first_on_bit(encoder::ScalarEncoder, input)
+
+function _get_first_on_bit(encoder::AbstractScalarEncoder, input)
     if input === nothing
         return nothing
     else
@@ -274,7 +237,7 @@ function _get_first_on_bit(encoder::ScalarEncoder, input)
 end
 
 
-function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float64})
+function get_bucket_indices(encoder::AbstractScalarEncoder, input::Union{Nothing, Float64})
     if input === nothing || isnan(input) return [nothing] end
     
     minbin = _get_first_on_bit(encoder, input)
@@ -290,7 +253,7 @@ function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float6
 end
 
 
-function encode_into_array(encoder::ScalarEncoder, input, output::BitArray; learn::Bool=true)
+function encode_into_array(encoder::AbstractScalarEncoder, input, output::BitArray; learn::Bool=true)
     if input !== nothing && isnan(input) 
         input = nothing 
     end
@@ -340,7 +303,7 @@ function encode_into_array(encoder::ScalarEncoder, input, output::BitArray; lear
 end
 
 
-function decode(encoder::ScalarEncoder, encoded::Union{Vector{Int64}, Vector{Float64}}; parent_field_name="")
+function decode(encoder::AbstractScalarEncoder, encoded::Union{Vector{Int64}, Vector{Float64}}; parent_field_name="")
     tmp_output = BitArray( encoded[1:encoder.n] .> 0 )
 
     if !any(x->x>0, tmp_output)
@@ -355,7 +318,7 @@ function decode(encoder::ScalarEncoder, encoded::Union{Vector{Int64}, Vector{Flo
 end
 
 
-function decode(encoder::ScalarEncoder, encoded::BitArray; parent_field_name="")
+function decode(encoder::AbstractScalarEncoder, encoded::BitArray; parent_field_name="")
     if !any(x->x>0, encoded)
         return Dict(), []
     end
@@ -370,7 +333,7 @@ function decode(encoder::ScalarEncoder, encoded::BitArray; parent_field_name="")
 end
 
 
-function _decode(encoder::ScalarEncoder, tmp_output::BitArray; parent_field_name="")
+function _decode(encoder::AbstractScalarEncoder, tmp_output::BitArray; parent_field_name="")
     max_zeros_in_a_row = encoder.halfwidth
     for i in 1:max_zeros_in_a_row 
         search_str = ones(i + 2)
@@ -478,7 +441,7 @@ function _decode(encoder::ScalarEncoder, tmp_output::BitArray; parent_field_name
 end
 
 
-function _generate_range_description(encoder::ScalarEncoder, ranges)
+function _generate_range_description(encoder::AbstractScalarEncoder, ranges)
     desc = ""
     num_ranges = length(ranges)
     for i in 1:num_ranges
@@ -495,7 +458,7 @@ function _generate_range_description(encoder::ScalarEncoder, ranges)
 end
 
 
-function _get_top_down_mapping!(encoder::ScalarEncoder)
+function _get_top_down_mapping!(encoder::AbstractScalarEncoder)
     # Do we need to build up our reverse mapping table?
     if encoder._top_down_mapping_m === nothing
         if encoder.periodic
@@ -521,7 +484,7 @@ function _get_top_down_mapping!(encoder::ScalarEncoder)
 end
 
 
-function get_bucket_values(encoder::ScalarEncoder)
+function get_bucket_values(encoder::AbstractScalarEncoder)
     if encoder._bucket_values === nothing
         top_down_mapping_m = _get_top_down_mapping!(encoder)
         num_buckets = size(top_down_mapping_m, 1)
@@ -535,7 +498,7 @@ function get_bucket_values(encoder::ScalarEncoder)
 end
 
 
-function get_bucket_info(encoder::ScalarEncoder, buckets)
+function get_bucket_info(encoder::AbstractScalarEncoder, buckets)
     top_down_mapping_m = _get_top_down_mapping!(encoder)
 
     category = buckets[1]
@@ -551,7 +514,7 @@ function get_bucket_info(encoder::ScalarEncoder, buckets)
 end
 
 
-function top_down_compute(encoder::ScalarEncoder, encoded)
+function top_down_compute(encoder::AbstractScalarEncoder, encoded)
     top_down_mapping_m = _get_top_down_mapping!(encoder)
 
     category = argmax(top_down_mapping_m * encoded)
@@ -560,7 +523,7 @@ function top_down_compute(encoder::ScalarEncoder, encoded)
 end
 
 
-function closeness_scores(encoder::ScalarEncoder, exp_values, act_values; fractional=true)
+function closeness_scores(encoder::AbstractScalarEncoder, exp_values, act_values; fractional=true)
     exp_value = exp_values[1]
     act_value = act_values[1]
     if encoder.periodic

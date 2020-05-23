@@ -3,54 +3,25 @@ using Printf
 abstract type Encoder end
 
 
-function get_encoders(encoder::Encoder)
-    error("Encoder method get_encoders not implemented")
-end
+## TO DELETE
+# get_encoders(encoder::Encoder) = error("Encoder method get_encoders not implemented")
+# get_name(encoder::Encoder) = error("Encoder method get_name not implemented")
+# get_flattened_field_type_list(encoder::Encoder) = nothing
+# set_flattened_field_type_list(encoder::Encoder, field_types) = nothing
+# get_flattened_encoder_list(encoder::Encoder) = nothing
+# set_flattened_encoder_list(encoder::Encoder, encoders) = nothing
 
 
-function get_name(encoder::Encoder)
-    error("Encoder method get_name not implemented")
-end
+# Trait Methods
+# get_width(encoder::Encoder) = error("Encoder method get_width not implemented")
+# get_description(encoder::Encoder) = error("getDescription must be implemented by all subclasses")
+# get_bucket_values(encoder::Encoder, decoded_results) = error("getBucketValues must be implemented by all subclasses")
+# encode_into_array(encoder::Encoder, input_data, output::BitArray; learn=true) = error("Encoder method encode_into_array not implemented")
 
 
-function get_flattened_field_type_list(encoder::Encoder)
-    return
-end
-
-
-function set_flattened_field_type_list(encoder::Encoder, field_types)
-    return
-end
-
-
-function get_flattened_encoder_list(encoder::Encoder)
-    return
-end
-
-
-function set_flattened_encoder_list(encoder::Encoder, encoders)
-    return
-end
-
-
-function get_width(encoder::Encoder)
-    error("Encoder method get_width not implemented")
-end
-
-
-function encode_into_array(encoder::Encoder, input_data, output::BitArray; learn=true)
-    error("Encoder method encode_into_array not implemented")
-end
-
-
-function set_learning(encoder::Encoder, learning_enabled::Bool)
-    return
-end
-
-
-function set_field_stats(encoder::Encoder)
-    return
-end
+set_learning(encoder::Encoder, learning_enabled::Bool) = nothing
+set_field_stats(encoder::Encoder) = nothing
+set_state_lock(encoder::Encoder, lock) = nothing
 
 
 function encode(encoder::Encoder, input_data)
@@ -63,7 +34,7 @@ end
 function get_scaler_names(encoder::Encoder; parent_field_name="") 
     names = String[]
 
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     if encoders !== nothing        
         for (name, encoder, offset) in encoders
@@ -76,7 +47,7 @@ function get_scaler_names(encoder::Encoder; parent_field_name="")
         if parent_field_name != ""
             push!(names, parent_field_name)
         else 
-            push!(names, get_name(encoder))
+            push!(names, encoder.name)
         end
     end
 
@@ -85,7 +56,7 @@ end
 
 
 function get_decoder_output_field_types(encoder::Encoder) 
-    flattened_field_type_list = get_flattened_field_type_list(encoder)
+    flattened_field_type_list = encoder.flattened_field_type_list
 
     if flattened_field_type_list !== nothing
         return flattened_field_type_list
@@ -93,31 +64,21 @@ function get_decoder_output_field_types(encoder::Encoder)
 
     field_types = []
 
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     for (name, encoder, offset) in encoders
         sub_types = get_decoder_output_field_types(encoder)
         append!(encoders, sub_types)
     end
 
-    set_flattened_field_type_list(encoder, field_types)
+    encoder.flattened_field_type_list = field_types
 
     return field_types
 end
 
 
-function set_state_lock(encoder::Encoder, lock)
-    return
-end
-
-
-# function get_input_value(encoder::Encoder, obj::Dict, field_name)
-    # input_data should strictly be a Dict so there is no need to disambiguate
-# end
-
-
 function get_encoder_list(encoder::Encoder)
-    flattened_encoder_list = get_flattened_encoder_list(encoder)
+    flattened_encoder_list = encoder.flattened_encoder_list
 
     if flattened_encoder_list !== nothing
         return flattened_encoder_list
@@ -125,7 +86,7 @@ function get_encoder_list(encoder::Encoder)
 
     encoders = []
 
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     if encoders !== nothing
         for (name, encoder, offset) in encoders
@@ -136,14 +97,14 @@ function get_encoder_list(encoder::Encoder)
         push!(encoders, encoder)
     end
 
-    set_flattened_encoder_list(encoder, encoders)
+    encoder.flattened_encoder_list = encoders
 
     return encoders
 end
 
 
 function get_scalars(encoder::Encoder, input_data)
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     if encoders !== nothing
         ret_vals = []
@@ -164,7 +125,7 @@ end
 function get_encoded_values(encoder::Encoder, input_data)
     ret_vals = []
 
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     if encoders !== nothing 
         for (name, encoder, offset) in encoders
@@ -189,7 +150,7 @@ end
 
 function get_bucket_indices(encoder::Encoder, input_data)
     ret_vals = []
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
     if encoders !== nothing
         for (name, encoder, offset) in encoders
             values = get_bucket_indices(encoder, input_data[name])
@@ -218,11 +179,6 @@ function scalars_to_str(encoder::Encoder, scalar_values; scalar_names=nothing)
     end
 
     return desc
-end
-
-
-function get_description(encoder::Encoder)
-    error("getDescription must be implemented by all subclasses")
 end
 
 
@@ -311,12 +267,12 @@ function decode(encoder::Encoder, encoded::Union{BitArray, Vector{Int64}, Vector
     fields_order = []
 
     if parent_field_name == ""
-        parent_name = get_name(encoder)
+        parent_name = encoder.name
     else
-        parent_name = "$parent_field_name.$(get_name(encoder))"
+        parent_name = "$parent_field_name.$(encoder.name)"
     end
 
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     if encoders !== nothing
         for i in 1:length(encoders)
@@ -357,20 +313,15 @@ function decoded_to_str(encoder::Encoder, decoded_results)
 end
 
 
-function get_bucket_values(encoder::Encoder, decoded_results)
-    error("getBucketValues must be implemented by all subclasses")
-end
-
-
 function get_bucket_info(encoder::Encoder, buckets)
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
     if encoders === nothing()
         error("Must be implemented in sub-class")
     end
 
     ret_vals = []
     bucket_offset = 0
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
     for i in 1:length(encoders)
         (name, encoder, offset) = encoders[i]
         
@@ -393,13 +344,13 @@ end
 
 
 function top_down_compute(encoder::Encoder, encoded)
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
     if encoders === nothing()
         error("Must be implemented in sub-class")
     end
 
     ret_vals = []
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
     for i in 1:length(encoders)
         (name, encoder, offset) = encoders[i]
 
@@ -424,7 +375,7 @@ end
 
 
 function closeness_scores(encoder::Encoder, exp_values, act_values; fractional=true)
-    encoders = get_encoders(encoder)
+    encoders = encoder.encoders
 
     if encoders === nothing
         err = abs(exp_values[1] - act_values[1])

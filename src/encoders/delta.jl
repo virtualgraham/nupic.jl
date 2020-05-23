@@ -1,3 +1,3 @@
-mutable struct DeltaEncoder <: AbstractAbstractScalarEncoder
+mutable struct DeltaEncoder <: AbstractAdaptiveScalarEncoder
 
 end
