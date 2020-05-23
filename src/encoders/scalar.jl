@@ -234,7 +234,6 @@ function _get_first_on_bit(encoder::ScalarEncoder, input)
     if input === nothing
         return nothing
     else
-
         if input < encoder.minval
             if encoder.clip_input && !encoder.periodic
                 if encoder.verbosity > 0
@@ -266,7 +265,7 @@ function _get_first_on_bit(encoder::ScalarEncoder, input)
         centerbin::Integer = if encoder.periodic
             Integer(floor((input - encoder.minval) * encoder.n_internal / encoder.range) + encoder.padding)
         else
-            Integer(floor(((input - encoder.minval) * encoder.resolution/2) / encoder.resolution) + encoder.padding)
+            Integer(floor(((input - encoder.minval) + encoder.resolution/2) / encoder.resolution) + encoder.padding)
         end
 
         minbin = centerbin - encoder.halfwidth;
@@ -287,7 +286,7 @@ function get_bucket_indices(encoder::ScalarEncoder, input::Union{Nothing, Float6
         bucket_idx = minbin
     end
 
-    return [bucket_idx]
+    return [bucket_idx + 1]
 end
 
 
@@ -341,8 +340,8 @@ function encode_into_array(encoder::ScalarEncoder, input, output::BitArray; lear
 end
 
 
-function decode(encoder::ScalarEncoder, encoded::Vector{Float64}; parent_field_name="")
-    tmp_output = BitArray( encoded .<= 0 )
+function decode(encoder::ScalarEncoder, encoded::Union{Vector{Int64}, Vector{Float64}}; parent_field_name="")
+    tmp_output = BitArray( encoded[1:encoder.n] .> 0 )
 
     if !any(x->x>0, tmp_output)
         return Dict(), []
@@ -374,13 +373,13 @@ end
 function _decode(encoder::ScalarEncoder, tmp_output::BitArray; parent_field_name="")
     max_zeros_in_a_row = encoder.halfwidth
     for i in 1:max_zeros_in_a_row 
-        search_str = ones(i + 3)
-        search_str[2:i + 2] .= 0
+        search_str = ones(i + 2)
+        search_str[2:lastindex(search_str)-1] .= 0
         sub_len = length(search_str)
 
         if encoder.periodic
             for j in 1:encoder.n
-                output_indices = collect(j+1:j+sub_len)
+                output_indices = collect(j:j+sub_len-1)
                 output_indices = map(x -> (x-1) % encoder.n + 1, output_indices)
                 if search_str == tmp_output[output_indices]
                     tmp_output[output_indices] .= 1
@@ -388,8 +387,8 @@ function _decode(encoder::ScalarEncoder, tmp_output::BitArray; parent_field_name
             end
         else
             for j in 1:(encoder.n - sub_len + 1)
-                if search_str == tmp_output[j:(j + sub_len)]
-                    tmp_output[j:j + sub_len] .= 1
+                if search_str == tmp_output[j:(j + sub_len - 1)]
+                    tmp_output[j:j + sub_len - 1] .= 1
                 end
             end
         end
@@ -425,7 +424,7 @@ function _decode(encoder::ScalarEncoder, tmp_output::BitArray; parent_field_name
     for run in runs
         (start, run_len) = run
         if run_len <= encoder.w
-            left = right = start + run_len/2
+            left = right = start + floor(run_len/2)
         else
             left = start + encoder.halfwidth
             right = start + run_len - 1 - encoder.halfwidth
@@ -488,8 +487,8 @@ function _generate_range_description(encoder::ScalarEncoder, ranges)
         else
             desc *= @sprintf("%.2f", ranges[i][1])
         end
-        if i < num_ranges - 1
-            desc *= ","
+        if i < num_ranges
+            desc *= ", "
         end
     end
     return desc
@@ -508,7 +507,7 @@ function _get_top_down_mapping!(encoder::ScalarEncoder)
         num_categories = length(encoder._top_down_values)
         encoder._top_down_mapping_m = spzeros(num_categories, encoder.n)
 
-        output_space = zeros(Int64, encoder.n)
+        output_space = BitArray(undef, encoder.n)
         for i in 1:num_categories 
             value = encoder._top_down_values[i]
             value = max(value, encoder.minval)
@@ -528,7 +527,7 @@ function get_bucket_values(encoder::ScalarEncoder)
         num_buckets = size(top_down_mapping_m, 1)
         encoder._bucket_values = []
         for bucket_idx in 1:num_buckets
-            push!(encoder._bucket_values, get_bucket_info(encoder, [bucket_idx])[0].value)
+            push!(encoder._bucket_values, get_bucket_info(encoder, [bucket_idx])[1].value)
         end
     end
 
@@ -539,16 +538,16 @@ end
 function get_bucket_info(encoder::ScalarEncoder, buckets)
     top_down_mapping_m = _get_top_down_mapping!(encoder)
 
-    category = buckets[0]
+    category = buckets[1]
     encoding = encoder._top_down_mapping_m[category,:]
 
     if encoder.periodic
-        input_val = (encoder.minval + (encoder.resolution / 2.0) + (category * encoder.resolution))
+        input_val = (encoder.minval + (encoder.resolution / 2.0) + ((category-1) * encoder.resolution))
     else
-        inputVal = encoder.minval + (category * encoder.resolution)
+        input_val = encoder.minval + ((category-1) * encoder.resolution)
     end
     
-    return [(value=inputVal, scalar=inputVal, encoding=encoding)]
+    return [(value=input_val, scalar=input_val, encoding=encoding)]
 end
 
 
@@ -557,7 +556,7 @@ function top_down_compute(encoder::ScalarEncoder, encoded)
 
     category = argmax(top_down_mapping_m * encoded)
 
-    return get_bucket_info(encoded, [category])
+    return get_bucket_info(encoder, [category])
 end
 
 

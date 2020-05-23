@@ -306,7 +306,7 @@ function pprint(encoder::Encoder, output; prefix="")
 end
 
 
-function decode(encoder::Encoder, encoded; parent_field_name="")
+function decode(encoder::Encoder, encoded::Union{BitArray, Vector{Int64}, Vector{Float64}}; parent_field_name="")
     fields_dict = Dict()
     fields_order = []
 
