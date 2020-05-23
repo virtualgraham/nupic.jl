@@ -1,6 +1,5 @@
 @testset "ScalarEncoderTest" begin
     
-
     @testset "test_scalar_encoder" begin
         mv = ScalarEncoder(3, 1, 8; name="mv", n=14, periodic=false, forced=true)
         empty = encode(mv, nothing)
@@ -235,33 +234,36 @@
 
 
     @testset "test_encode_invalid_input_type" begin
-
+        encoder = ScalarEncoder(3, 1, 8; name="enc", n=14, periodic=false, forced=true)
+        @test_throws MethodError encode(encoder, "String")
     end
 
 
     @testset "test_get_bucket_info_int_resolution" begin
-
+        encoder = ScalarEncoder(3, 1, 8; resolution=1, periodic=true, forced=true)
+        @test 4.5 == top_down_compute(encoder, encode(encoder, 4.5))[1].scalar
     end
 
 
     @testset "test_read_write" begin
-
+        #TODO: Implement
     end
 
 
     @testset "test_setting_n_with_maxval_minval_none" begin
-
+        encoder = ScalarEncoder(3, nothing, nothing; name="scalar", n=14, radius=0, resolution=0, forced=true)
+        @test isa(encoder, ScalarEncoder)
     end
 
 
     @testset "test_setting_scalar_and_resolution" begin
-
+        @test_throws ErrorException ScalarEncoder(3, nothing, nothing; name="scalar", n=0, radius=nothing, resolution=0.5, forced=true)
     end
 
 
     @testset "test_setting_radius_with_maxval_minavl_none" begin
-
+        encoder = ScalarEncoder(3, nothing, nothing; name="scalar", n=0, radius=1.5, resolution=0, forced=true)
+        @test isa(encoder, ScalarEncoder)
     end
 
-    
 end
