@@ -43,6 +43,7 @@ mutable struct AdaptiveScalarEncoder <: AbstractAdaptiveScalarEncoder
     end
 end
 
+## Boilerplate code to emulate inheretance 
 Base.getproperty(encoder::AdaptiveScalarEncoder, s::Symbol) = get(encoder, Val(s))
 get(encoder::AdaptiveScalarEncoder, ::Val{T}) where {T}  = getfield(encoder, T) # fall back to getfield
 get(encoder::AdaptiveScalarEncoder, ::Val{:w}) = encoder.super.w
@@ -67,54 +68,20 @@ get(encoder::AdaptiveScalarEncoder, ::Val{:padding}) = encoder.super.padding
 get(encoder::AdaptiveScalarEncoder, ::Val{:flattened_field_type_list}) = encoder.super.flattened_field_type_list
 get(encoder::AdaptiveScalarEncoder, ::Val{:flattened_encoder_list}) = encoder.super.flattened_encoder_list
 
-
 Base.setproperty!(encoder::AdaptiveScalarEncoder, s::Symbol, x) = set!(encoder, Val(s), x)
 set!(encoder::AdaptiveScalarEncoder, ::Val{T}, x) where {T}  = setfield!(encoder, T, x) # fall back to getfield
+set!(encoder::AdaptiveScalarEncoder, ::Val{:_top_down_values}, x) = encoder.super._top_down_values = x
+set!(encoder::AdaptiveScalarEncoder, ::Val{:_top_down_mapping_m}, x) = encoder.super._top_down_mapping_m = x
+set!(encoder::AdaptiveScalarEncoder, ::Val{:_bucket_values}, x) = encoder.super._bucket_values = x
+set!(encoder::AdaptiveScalarEncoder, ::Val{:flattened_encoder_list}, x) = encoder.super.flattened_encoder_list = x
+set!(encoder::AdaptiveScalarEncoder, ::Val{:flattened_field_type_list}, x) = encoder.super.flattened_field_type_list = x
 
-function set!(encoder::AdaptiveScalarEncoder, ::Val{:_top_down_values}, x)
-    encoder.super._top_down_values = x
-end
-
-function set!(encoder::AdaptiveScalarEncoder, ::Val{:_top_down_mapping_m}, x)
-    encoder.super._top_down_mapping_m = x
-end
-
-function set!(encoder::AdaptiveScalarEncoder, ::Val{:_bucket_values}, x)
-    encoder.super._bucket_values = x
-end
-
-function set!(encoder::AdaptiveScalarEncoder, ::Val{:flattened_encoder_list}, x)
-    encoder.super.flattened_encoder_list = x
-end
-
-function set!(encoder::AdaptiveScalarEncoder, ::Val{:flattened_field_type_list}, x)
-    encoder.super.flattened_field_type_list = x
-end
-
-# function set!(encoder::AdaptiveScalarEncoder, ::Val{:range_internal}, x)
-#     encoder.super.range_internal = x
-# end
-
-# function set!(encoder::AdaptiveScalarEncoder, ::Val{:maxval}, x)
-#     encoder.super.maxval = x
-# end
-
-# function set!(encoder::AdaptiveScalarEncoder, ::Val{:minval}, x)
-#     encoder.super.minval = x
-# end
-
-# function set!(encoder::AdaptiveScalarEncoder, ::Val{:resolution}, x)
-#     encoder.super.resolution = x
-# end
-
-# function set!(encoder::AdaptiveScalarEncoder, ::Val{:radius}, x)
-#     encoder.super.radius = x
-# end
-
-# function set!(encoder::AdaptiveScalarEncoder, ::Val{:range}, x)
-#     encoder.super.range = x
-# end
-
+# set!(encoder::AdaptiveScalarEncoder, ::Val{:range_internal}, x) = encoder.super.range_internal = x
+# set!(encoder::AdaptiveScalarEncoder, ::Val{:maxval}, x) = encoder.super.maxval = x
+# set!(encoder::AdaptiveScalarEncoder, ::Val{:minval}, x) = encoder.super.minval = x
+# set!(encoder::AdaptiveScalarEncoder, ::Val{:resolution}, x) = encoder.super.resolution = x
+# set!(encoder::AdaptiveScalarEncoder, ::Val{:radius}, x) = encoder.super.radius = x
+# set!(encoder::AdaptiveScalarEncoder, ::Val{:range}, x) = encoder.super.range = x
 
 
 
