@@ -190,9 +190,6 @@ function _recalc_params!(encoder::AbstractScalarEncoder)
 end
 
 
-
-
-
 function _get_first_on_bit(encoder::AbstractScalarEncoder, input)
     if input === nothing
         return nothing
