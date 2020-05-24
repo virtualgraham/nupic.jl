@@ -1,6 +1,6 @@
 using Printf
 
-abstract type AbstractAdaptiveScalarEncoder <: AbstractScalarEncoder end
+abstract type AbstractAdaptiveScalarEncoder <: ScalarEncoderSubtype end
 
 mutable struct AdaptiveScalarEncoder <: AbstractAdaptiveScalarEncoder
     scalar_encoder::ScalarEncoder
@@ -43,46 +43,6 @@ mutable struct AdaptiveScalarEncoder <: AbstractAdaptiveScalarEncoder
         )
     end
 end
-
-## Boilerplate code to emulate inheretance 
-Base.getproperty(encoder::AbstractAdaptiveScalarEncoder, s::Symbol) = get(encoder, Val(s))
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{T}) where {T}  = getfield(encoder, T) # fall back to getfield
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:w}) = encoder.scalar_encoder.w
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:minval}) = encoder.scalar_encoder.minval
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:maxval}) = encoder.scalar_encoder.maxval
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:periodic}) = encoder.scalar_encoder.periodic
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:n}) = encoder.scalar_encoder.n
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:radius}) = encoder.scalar_encoder.radius
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:resolution}) = encoder.scalar_encoder.resolution
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:name}) = encoder.scalar_encoder.name
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:verbosity}) = encoder.scalar_encoder.verbosity
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:clip_input}) = encoder.scalar_encoder.clip_input
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:encoders}) = encoder.scalar_encoder.encoders
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:halfwidth}) = encoder.scalar_encoder.halfwidth
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:range}) = encoder.scalar_encoder.range
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:range_internal}) = encoder.scalar_encoder.range_internal
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:n_internal}) = encoder.scalar_encoder.n_internal
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:_top_down_mapping_m}) = encoder.scalar_encoder._top_down_mapping_m
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:_top_down_values}) = encoder.scalar_encoder._top_down_values
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:_bucket_values}) = encoder.scalar_encoder._bucket_values
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:padding}) = encoder.scalar_encoder.padding
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:flattened_field_type_list}) = encoder.scalar_encoder.flattened_field_type_list
-get(encoder::AbstractAdaptiveScalarEncoder, ::Val{:flattened_encoder_list}) = encoder.scalar_encoder.flattened_encoder_list
-
-Base.setproperty!(encoder::AdaptiveScalarEncoder, s::Symbol, x) = set!(encoder, Val(s), x)
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{T}, x) where {T}  = setfield!(encoder, T, x) # fall back to getfield
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:_top_down_values}, x) = encoder.scalar_encoder._top_down_values = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:_top_down_mapping_m}, x) = encoder.scalar_encoder._top_down_mapping_m = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:_bucket_values}, x) = encoder.scalar_encoder._bucket_values = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:flattened_encoder_list}, x) = encoder.scalar_encoder.flattened_encoder_list = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:flattened_field_type_list}, x) = encoder.scalar_encoder.flattened_field_type_list = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:range_internal}, x) = encoder.scalar_encoder.range_internal = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:resolution}, x) = encoder.scalar_encoder.resolution = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:radius}, x) = encoder.scalar_encoder.radius = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:range}, x) = encoder.scalar_encoder.range = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:n_internal}, x) = encoder.scalar_encoder.n_internal = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:maxval}, x) = encoder.scalar_encoder.maxval = x
-set!(encoder::AbstractAdaptiveScalarEncoder, ::Val{:minval}, x) = encoder.scalar_encoder.minval = x
 
 
 function _set_encoder_params!(encoder::AbstractAdaptiveScalarEncoder)
@@ -210,3 +170,21 @@ function Base.show(io::IO, encoder::AdaptiveScalarEncoder)
         """
     )
 end
+
+#
+# All subtypes of this type should have a field:
+#    adaptive_scalar_encoder::AdaptiveScalarEncoder
+#
+abstract type AdaptiveScalarEncoderSubtype <: AbstractAdaptiveScalarEncoder end # Only Subtypes of ScalarEncoder
+
+## Boilerplate code to emulate inheretance 
+Base.getproperty(encoder::AdaptiveScalarEncoderSubtype, s::Symbol) = get(encoder, Val(s))
+get(encoder::AdaptiveScalarEncoderSubtype, ::Val{T}) where {T}  = getfield(encoder, T) # fall back to getfield
+get(encoder::AdaptiveScalarEncoderSubtype, ::Val{:scalar_encoder}) = encoder.adaptive_scalar_encoder.scalar_encoder
+get(encoder::AdaptiveScalarEncoderSubtype, ::Val{:record_num}) = encoder.adaptive_scalar_encoder.record_num
+get(encoder::AdaptiveScalarEncoderSubtype, ::Val{:sliding_window}) = encoder.adaptive_scalar_encoder.sliding_window
+
+Base.setproperty!(encoder::AdaptiveScalarEncoderSubtype, s::Symbol, x) = set!(encoder, Val(s), x)
+set!(encoder::AdaptiveScalarEncoderSubtype, ::Val{T}, x) where {T}  = setfield!(encoder, T, x) # fall back to getfield
+set!(encoder::AdaptiveScalarEncoderSubtype, ::Val{:record_num}, x) = encoder.scalar_encoder.record_num = x
+set!(encoder::AdaptiveScalarEncoderSubtype, ::Val{:sliding_window}, x) = encoder.scalar_encoder.sliding_window = x

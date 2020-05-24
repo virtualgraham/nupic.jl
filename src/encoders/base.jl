@@ -18,8 +18,8 @@ abstract type Encoder end
 
 # Trait Methods keep documentated
 # get_width(encoder::Encoder) = error("Encoder method get_width not implemented")
-# get_description(encoder::Encoder) = error("getDescription must be implemented by all subclasses")
-# get_bucket_values(encoder::Encoder, decoded_results) = error("getBucketValues must be implemented by all subclasses")
+# get_description(encoder::Encoder) = error("getDescription must be implemented by all subtypes")
+# get_bucket_values(encoder::Encoder, decoded_results) = error("getBucketValues must be implemented by all subtypes")
 # encode_into_array(encoder::Encoder, input_data, output::BitArray; learn=true) = error("Encoder method encode_into_array not implemented")
 
 

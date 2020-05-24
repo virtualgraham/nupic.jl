@@ -1,4 +1,4 @@
-abstract type AbstractDeltaEncoder <: AbstractAdaptiveScalarEncoder end
+abstract type AbstractDeltaEncoder <: AdaptiveScalarEncoderSubtype end
 
 mutable struct DeltaEncoder <: AbstractDeltaEncoder
     adaptive_scalar_encoder:: AdaptiveScalarEncoder
@@ -58,17 +58,7 @@ mutable struct DeltaEncoder <: AbstractDeltaEncoder
     end
 end
 
-## Boilerplate code to emulate inheretance 
-Base.getproperty(encoder::AbstractDeltaEncoder, s::Symbol) = get(encoder, Val(s))
-get(encoder::AbstractDeltaEncoder, ::Val{T}) where {T}  = getfield(encoder, T) # fall back to getfield
-get(encoder::AbstractDeltaEncoder, ::Val{:scalar_encoder}) = encoder.adaptive_scalar_encoder.scalar_encoder
-get(encoder::AbstractDeltaEncoder, ::Val{:record_num}) = encoder.adaptive_scalar_encoder.record_num
-get(encoder::AbstractDeltaEncoder, ::Val{:sliding_window}) = encoder.adaptive_scalar_encoder.sliding_window
 
-Base.setproperty!(encoder::AbstractDeltaEncoder, s::Symbol, x) = set!(encoder, Val(s), x)
-set!(encoder::AbstractDeltaEncoder, ::Val{T}, x) where {T}  = setfield!(encoder, T, x) # fall back to getfield
-set!(encoder::AbstractDeltaEncoder, ::Val{:record_num}, x) = encoder.scalar_encoder.record_num = x
-set!(encoder::AbstractDeltaEncoder, ::Val{:sliding_window}, x) = encoder.scalar_encoder.sliding_window = x
 
 function encode_into_array(encoder::AbstractDeltaEncoder, input, output::BitArray; learn=nothing)
     if learn === nothing
