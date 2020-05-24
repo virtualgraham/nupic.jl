@@ -3,11 +3,10 @@ using SparseArrays
 
 import Base.show
 
-abstract type AbstractScalarEncoder <: Encoder end
-
 const DEFAULT_RESOLUTION = 0
 const DEFAULT_RADIUS = 0
 
+abstract type AbstractScalarEncoder <: Encoder end
 
 mutable struct ScalarEncoder <: AbstractScalarEncoder
     w::Integer
@@ -234,7 +233,7 @@ function _get_first_on_bit(encoder::AbstractScalarEncoder, input)
 end
 
 
-function get_bucket_indices(encoder::AbstractScalarEncoder, input::Union{Nothing, Float64})
+function get_bucket_indices(encoder::AbstractScalarEncoder, input; learn=nothing)
     if input === nothing || isnan(input) return [nothing] end
     
     minbin = _get_first_on_bit(encoder, input)
@@ -250,7 +249,7 @@ function get_bucket_indices(encoder::AbstractScalarEncoder, input::Union{Nothing
 end
 
 
-function encode_into_array(encoder::AbstractScalarEncoder, input, output::BitArray; learn::Bool=true)
+function encode_into_array(encoder::AbstractScalarEncoder, input, output::BitArray; learn=nothing)
     if input !== nothing && isnan(input) 
         input = nothing 
     end
