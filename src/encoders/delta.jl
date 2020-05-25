@@ -1,7 +1,7 @@
-abstract type AbstractDeltaEncoder <: AdaptiveScalarEncoderSubtype end
+abstract type AbstractDeltaEncoder <: AbstractAdaptiveScalarEncoder end
 
 mutable struct DeltaEncoder <: AbstractDeltaEncoder
-    adaptive_scalar_encoder:: AdaptiveScalarEncoder
+    super:: AdaptiveScalarEncoder
     learning_enabled
     state_lock
     width
@@ -22,7 +22,7 @@ mutable struct DeltaEncoder <: AbstractDeltaEncoder
         forced::Bool=false
     )
 
-        adaptive_scalar_encoder = AdaptiveScalarEncoder(
+        super = AdaptiveScalarEncoder(
             w,
             minval,
             maxval,
@@ -44,7 +44,7 @@ mutable struct DeltaEncoder <: AbstractDeltaEncoder
         prev_delta = nothing
 
         return new(
-            adaptive_scalar_encoder,
+            super,
             learning_enabled,
             state_lock,
             width,
@@ -71,7 +71,7 @@ function encode_into_array(encoder::AbstractDeltaEncoder, input, output::BitArra
             encoder.prev_absolute = input
         end
         delta = input - encoder.prev_absolute
-        encode_into_array(encoder.adaptive_scalar_encoder, delta, output; learn=learn)
+        encode_into_array(encoder.super, delta, output; learn=learn)
         if !encoder.state_lock
             encoder.prev_absolute = input
             encoder.prev_delta = delta
@@ -83,15 +83,15 @@ set_state_lock(encoder::AbstractDeltaEncoder, lock) = encoder.state_lock = lock
 
 set_field_stats!(encoder::AbstractDeltaEncoder, field_name, field_stats) = nothing
 
-# get_bucket_indices(encoder::AbstractDeltaEncoder, input; learn=nothing) = get_bucket_indices(encoder.adaptive_scalar_encoder, input; learn=learn)
+# get_bucket_indices(encoder::AbstractDeltaEncoder, input; learn=nothing) = get_bucket_indices(encoder.super, input; learn=learn)
 
-# get_bucket_info(encoder::AbstractDeltaEncoder, buckets) = get_bucket_info(encoder.adaptive_scalar_encoder, buckets)
+# get_bucket_info(encoder::AbstractDeltaEncoder, buckets) = get_bucket_info(encoder.super, buckets)
 
 function top_down_compute(encoder::AbstractDeltaEncoder, encoded)
     if encoder.prev_absolute === nothing || encoder.prev_delta === nothing 
         return [(value=0, scalar=0, encoding=zeros(encoder.n))]
     end
-    ret = top_down_compute(encoder.adaptive_scalar_encoder, encoded)
+    ret = top_down_compute(encoder.super, encoded)
     if encoder.prev_absolute !== nothing
         ret = [(value=ret[1].value+encoder.prev_absolute, scalar=ret[1].scalar+encoder.prev_absolute, encoding=ret[1].encoding)]
     end

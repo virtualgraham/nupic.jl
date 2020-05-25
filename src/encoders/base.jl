@@ -1,6 +1,6 @@
 using Printf
 
-abstract type Encoder end
+abstract type Encoder <: Object end
 
 
 ## TO DELETE

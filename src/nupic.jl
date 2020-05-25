@@ -1,6 +1,7 @@
 module NuPIC
 
 include("utils.jl")
+include("object.jl")
 include("encoders/base.jl")
 
 # encoders

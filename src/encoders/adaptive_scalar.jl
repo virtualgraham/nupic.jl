@@ -1,9 +1,9 @@
 using Printf
 
-abstract type AbstractAdaptiveScalarEncoder <: ScalarEncoderSubtype end
+abstract type AbstractAdaptiveScalarEncoder <: AbstractScalarEncoder end
 
 mutable struct AdaptiveScalarEncoder <: AbstractAdaptiveScalarEncoder
-    scalar_encoder::ScalarEncoder
+    super::ScalarEncoder
     learning_enabled::Bool
     record_num::Integer
     sliding_window::MovingAverage
@@ -18,7 +18,7 @@ mutable struct AdaptiveScalarEncoder <: AbstractAdaptiveScalarEncoder
         clip_input::Bool=true,
         forced::Bool=false
     )
-        scalar_encoder = ScalarEncoder(
+        super = ScalarEncoder(
             w,
             minval,
             maxval;
@@ -36,7 +36,7 @@ mutable struct AdaptiveScalarEncoder <: AbstractAdaptiveScalarEncoder
         sliding_window = MovingAverage(300)
         
         return new(
-            scalar_encoder,
+            super,
             learning_enabled,
             record_num,
             sliding_window
@@ -117,7 +117,7 @@ function get_bucket_indices(encoder::AbstractAdaptiveScalarEncoder, input; learn
         return [nothing]
     else
         _set_min_and_max!(encoder, input, learn)
-        return get_bucket_indices(encoder.scalar_encoder, input)
+        return get_bucket_indices(encoder.super, input)
     end
 end
 
@@ -133,7 +133,7 @@ function encode_into_array(encoder::AbstractAdaptiveScalarEncoder, input, output
         _set_min_and_max!(encoder, input, learn)
     end
 
-    encode_into_array(encoder.scalar_encoder, input, output)
+    encode_into_array(encoder.super, input, output)
 end
 
 
@@ -141,7 +141,7 @@ function get_bucket_info(encoder::AbstractAdaptiveScalarEncoder, buckets)
     if encoder.minval === nothing || encoder.minval === nothing
         return [(value=0, scalar=0, encoding=zeros(encoder.n))]
     end
-    return get_bucket_info(encoder.scalar_encoder, buckets)
+    return get_bucket_info(encoder.super, buckets)
 end
 
 
@@ -149,7 +149,7 @@ function top_down_compute(encoder::AbstractAdaptiveScalarEncoder, encoded)
     if encoder.minval === nothing || encoder.minval === nothing
         return [(value=0, scalar=0, encoding=zeros(encoder.n))]
     end
-    return top_down_compute(encoder.scalar_encoder, encoded)
+    return top_down_compute(encoder.super, encoded)
 end
 
 
@@ -170,21 +170,3 @@ function Base.show(io::IO, encoder::AdaptiveScalarEncoder)
         """
     )
 end
-
-#
-# All subtypes of this type should have a field:
-#    adaptive_scalar_encoder::AdaptiveScalarEncoder
-#
-abstract type AdaptiveScalarEncoderSubtype <: AbstractAdaptiveScalarEncoder end # Only Subtypes of ScalarEncoder
-
-## Boilerplate code to emulate inheretance 
-Base.getproperty(encoder::AdaptiveScalarEncoderSubtype, s::Symbol) = get(encoder, Val(s))
-get(encoder::AdaptiveScalarEncoderSubtype, ::Val{T}) where {T}  = getfield(encoder, T) # fall back to getfield
-get(encoder::AdaptiveScalarEncoderSubtype, ::Val{:scalar_encoder}) = encoder.adaptive_scalar_encoder.scalar_encoder
-get(encoder::AdaptiveScalarEncoderSubtype, ::Val{:record_num}) = encoder.adaptive_scalar_encoder.record_num
-get(encoder::AdaptiveScalarEncoderSubtype, ::Val{:sliding_window}) = encoder.adaptive_scalar_encoder.sliding_window
-
-Base.setproperty!(encoder::AdaptiveScalarEncoderSubtype, s::Symbol, x) = set!(encoder, Val(s), x)
-set!(encoder::AdaptiveScalarEncoderSubtype, ::Val{T}, x) where {T}  = setfield!(encoder, T, x) # fall back to getfield
-set!(encoder::AdaptiveScalarEncoderSubtype, ::Val{:record_num}, x) = encoder.scalar_encoder.record_num = x
-set!(encoder::AdaptiveScalarEncoderSubtype, ::Val{:sliding_window}, x) = encoder.scalar_encoder.sliding_window = x

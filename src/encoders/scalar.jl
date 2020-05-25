@@ -6,7 +6,7 @@ import Base.show
 const DEFAULT_RESOLUTION = 0
 const DEFAULT_RADIUS = 0
 
-abstract type AbstractScalarEncoder <: Encoder end # ScalarEncoder and all subtypes of ScalarEncoder
+abstract type AbstractScalarEncoder <: Encoder end
 
 mutable struct ScalarEncoder <: AbstractScalarEncoder
     w::Integer
@@ -571,49 +571,3 @@ function Base.show(io::IO, encoder::ScalarEncoder)
         """
     )
 end
-
-
-#
-# All subtypes of this type should have a field:
-#   scalar_encoder::ScalarEncoder
-#
-abstract type ScalarEncoderSubtype <: AbstractScalarEncoder end # Only subtypes of ScalarEncoder
-
-Base.getproperty(encoder::ScalarEncoderSubtype, s::Symbol) = get(encoder, Val(s))
-get(encoder::ScalarEncoderSubtype, ::Val{T}) where {T}  = getfield(encoder, T) # fall back to getfield
-get(encoder::ScalarEncoderSubtype, ::Val{:w}) = encoder.scalar_encoder.w
-get(encoder::ScalarEncoderSubtype, ::Val{:minval}) = encoder.scalar_encoder.minval
-get(encoder::ScalarEncoderSubtype, ::Val{:maxval}) = encoder.scalar_encoder.maxval
-get(encoder::ScalarEncoderSubtype, ::Val{:periodic}) = encoder.scalar_encoder.periodic
-get(encoder::ScalarEncoderSubtype, ::Val{:n}) = encoder.scalar_encoder.n
-get(encoder::ScalarEncoderSubtype, ::Val{:radius}) = encoder.scalar_encoder.radius
-get(encoder::ScalarEncoderSubtype, ::Val{:resolution}) = encoder.scalar_encoder.resolution
-get(encoder::ScalarEncoderSubtype, ::Val{:name}) = encoder.scalar_encoder.name
-get(encoder::ScalarEncoderSubtype, ::Val{:verbosity}) = encoder.scalar_encoder.verbosity
-get(encoder::ScalarEncoderSubtype, ::Val{:clip_input}) = encoder.scalar_encoder.clip_input
-get(encoder::ScalarEncoderSubtype, ::Val{:encoders}) = encoder.scalar_encoder.encoders
-get(encoder::ScalarEncoderSubtype, ::Val{:halfwidth}) = encoder.scalar_encoder.halfwidth
-get(encoder::ScalarEncoderSubtype, ::Val{:range}) = encoder.scalar_encoder.range
-get(encoder::ScalarEncoderSubtype, ::Val{:range_internal}) = encoder.scalar_encoder.range_internal
-get(encoder::ScalarEncoderSubtype, ::Val{:n_internal}) = encoder.scalar_encoder.n_internal
-get(encoder::ScalarEncoderSubtype, ::Val{:_top_down_mapping_m}) = encoder.scalar_encoder._top_down_mapping_m
-get(encoder::ScalarEncoderSubtype, ::Val{:_top_down_values}) = encoder.scalar_encoder._top_down_values
-get(encoder::ScalarEncoderSubtype, ::Val{:_bucket_values}) = encoder.scalar_encoder._bucket_values
-get(encoder::ScalarEncoderSubtype, ::Val{:padding}) = encoder.scalar_encoder.padding
-get(encoder::ScalarEncoderSubtype, ::Val{:flattened_field_type_list}) = encoder.scalar_encoder.flattened_field_type_list
-get(encoder::ScalarEncoderSubtype, ::Val{:flattened_encoder_list}) = encoder.scalar_encoder.flattened_encoder_list
-
-Base.setproperty!(encoder::ScalarEncoderSubtype, s::Symbol, x) = set!(encoder, Val(s), x)
-set!(encoder::ScalarEncoderSubtype, ::Val{T}, x) where {T}  = setfield!(encoder, T, x) # fall back to getfield
-set!(encoder::ScalarEncoderSubtype, ::Val{:_top_down_values}, x) = encoder.scalar_encoder._top_down_values = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:_top_down_mapping_m}, x) = encoder.scalar_encoder._top_down_mapping_m = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:_bucket_values}, x) = encoder.scalar_encoder._bucket_values = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:flattened_encoder_list}, x) = encoder.scalar_encoder.flattened_encoder_list = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:flattened_field_type_list}, x) = encoder.scalar_encoder.flattened_field_type_list = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:range_internal}, x) = encoder.scalar_encoder.range_internal = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:resolution}, x) = encoder.scalar_encoder.resolution = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:radius}, x) = encoder.scalar_encoder.radius = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:range}, x) = encoder.scalar_encoder.range = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:n_internal}, x) = encoder.scalar_encoder.n_internal = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:maxval}, x) = encoder.scalar_encoder.maxval = x
-set!(encoder::ScalarEncoderSubtype, ::Val{:minval}, x) = encoder.scalar_encoder.minval = x
