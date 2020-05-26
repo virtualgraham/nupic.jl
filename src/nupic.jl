@@ -12,6 +12,6 @@ export get_width, encode_into_array, encode, get_scaler_names,
     get_bucket_indices, scalars_to_str, get_description, get_field_description, 
     encoded_bits_description, pprint_header, pprint, decode, decoded_to_str, 
     get_bucket_values, get_bucket_info, top_down_compute, closeness_scores, 
-    get_display_width, set_field_stats!
+    get_display_width, set_field_stats!, UNKNOWN, MISSING
 
 end # module

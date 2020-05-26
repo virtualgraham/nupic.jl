@@ -83,10 +83,9 @@ end
 
 function encode_into_array(encoder::AbstractCategoryEncoder, input, output::BitArray; learn=nothing)
     if input === nothing
-        output[1,:] = 0
+        output[1,:] .= 0
         val = MISSING
     else
-        println("input $input encoder.category_to_index $(encoder.category_to_index)")
         val = get(encoder.category_to_index, input, 1)
         encode_into_array(encoder.encoder, val, output)
     end
@@ -98,7 +97,7 @@ function encode_into_array(encoder::AbstractCategoryEncoder, input, output::BitA
 end
 
 
-function decode(encoder::AbstractCategoryEncoder, encoded::Union{Vector{Int64}, Vector{Float64}}; parent_field_name="")
+function decode(encoder::AbstractCategoryEncoder, encoded::Union{BitArray, Vector{Int64}, Vector{Float64}}; parent_field_name="")
     fields_dict, field_names = decode(encoder.encoder, encoded)
     if length(fields_dict) == 0
         return fields_dict, field_names
@@ -106,14 +105,14 @@ function decode(encoder::AbstractCategoryEncoder, encoded::Union{Vector{Int64}, 
 
     @assert length(fields_dict) == 1
 
-    in_ranges, indesc = iterate(values(fields_dict))
+    in_ranges, indesc = iterate(values(fields_dict))[1]
     out_ranges = []
     desc = ""
     for (min_v, max_v) in in_ranges
         min_v = Integer(round(min_v))
         max_v = Integer(round(max_v))
-        push!(out_ranges, (min_v, max_v))
-        while min_v < max_v
+        push!(out_ranges, [min_v, max_v])
+        while min_v <= max_v
             if length(desc) > 0
                 desc *= ", "
             end
