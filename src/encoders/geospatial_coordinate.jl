@@ -1,3 +1,5 @@
-mutable struct GeospatialCoordinateEncoder <: AbstractCoordinateEncoder
+abstract type AbstractGeospatialCoordinateEncoder <: AbstractCoordinateEncoder end
+
+mutable struct GeospatialCoordinateEncoder <: AbstractGeospatialCoordinateEncoder
 
 end

@@ -1,36 +1,54 @@
 using Printf
 
-abstract type Encoder <: Object end
+abstract type AbstractEncoder <: Object end
 
+mutable struct Encoder <: AbstractEncoder
+    name::String
+    encoders
+    flattened_encoder_list
+    flattened_field_type_list
+
+    function Encoder(
+        name::String,
+        encoders = nothing
+    )
+        return new(
+            name, 
+            encoders,
+            nothing,
+            nothing
+        )
+    end
+end
 
 ## TO DELETE
-# get_encoders(encoder::Encoder) = error("Encoder method get_encoders not implemented")
-# get_name(encoder::Encoder) = error("Encoder method get_name not implemented")
-# get_flattened_field_type_list(encoder::Encoder) = nothing
-# set_flattened_field_type_list(encoder::Encoder, field_types) = nothing
-# get_flattened_encoder_list(encoder::Encoder) = nothing
-# set_flattened_encoder_list(encoder::Encoder, encoders) = nothing
+# get_encoders(encoder::AbstractEncoder) = error("Encoder method get_encoders not implemented")
+# get_name(encoder::AbstractEncoder) = error("Encoder method get_name not implemented")
+# get_flattened_field_type_list(encoder::AbstractEncoder) = nothing
+# set_flattened_field_type_list(encoder::AbstractEncoder, field_types) = nothing
+# get_flattened_encoder_list(encoder::AbstractEncoder) = nothing
+# set_flattened_encoder_list(encoder::AbstractEncoder, encoders) = nothing
 
 ## POSSIBLY DELETE
-# set_learning(encoder::Encoder, learning_enabled::Bool) = nothing
-# set_field_stats(encoder::Encoder) = nothing
-# set_state_lock(encoder::Encoder, lock) = nothing
+# set_learning(encoder::AbstractEncoder, learning_enabled::Bool) = nothing
+# set_field_stats(encoder::AbstractEncoder) = nothing
+# set_state_lock(encoder::AbstractEncoder, lock) = nothing
 
 # Trait Methods keep documentated
-# get_width(encoder::Encoder) = error("Encoder method get_width not implemented")
-# get_description(encoder::Encoder) = error("getDescription must be implemented by all subtypes")
-# get_bucket_values(encoder::Encoder, decoded_results) = error("getBucketValues must be implemented by all subtypes")
-# encode_into_array(encoder::Encoder, input_data, output::BitArray; learn=true) = error("Encoder method encode_into_array not implemented")
+# get_width(encoder::AbstractEncoder) = error("Encoder method get_width not implemented")
+# get_description(encoder::AbstractEncoder) = error("getDescription must be implemented by all subtypes")
+# get_bucket_values(encoder::AbstractEncoder, decoded_results) = error("getBucketValues must be implemented by all subtypes")
+# encode_into_array(encoder::AbstractEncoder, input_data, output::BitArray; learn=true) = error("Encoder method encode_into_array not implemented")
 
 
-function encode(encoder::Encoder, input_data)
+function encode(encoder::AbstractEncoder, input_data)
     output = BitArray(undef, get_width(encoder))
     encode_into_array(encoder, input_data, output)
     return output
 end
 
 
-function get_scaler_names(encoder::Encoder; parent_field_name="") 
+function get_scaler_names(encoder::AbstractEncoder; parent_field_name="") 
     names = String[]
 
     encoders = encoder.encoders
@@ -54,7 +72,7 @@ function get_scaler_names(encoder::Encoder; parent_field_name="")
 end
 
 
-function get_decoder_output_field_types(encoder::Encoder) 
+function get_decoder_output_field_types(encoder::AbstractEncoder) 
     flattened_field_type_list = encoder.flattened_field_type_list
 
     if flattened_field_type_list !== nothing
@@ -76,7 +94,7 @@ function get_decoder_output_field_types(encoder::Encoder)
 end
 
 
-function get_encoder_list(encoder::Encoder)
+function get_encoder_list(encoder::AbstractEncoder)
     flattened_encoder_list = encoder.flattened_encoder_list
 
     if flattened_encoder_list !== nothing
@@ -102,7 +120,7 @@ function get_encoder_list(encoder::Encoder)
 end
 
 
-function get_scalars(encoder::Encoder, input_data)
+function get_scalars(encoder::AbstractEncoder, input_data)
     encoders = encoder.encoders
 
     if encoders !== nothing
@@ -121,7 +139,7 @@ function get_scalars(encoder::Encoder, input_data)
 end
 
 
-function get_encoded_values(encoder::Encoder, input_data)
+function get_encoded_values(encoder::AbstractEncoder, input_data)
     ret_vals = []
 
     encoders = encoder.encoders
@@ -147,7 +165,7 @@ function get_encoded_values(encoder::Encoder, input_data)
 end
 
 
-function get_bucket_indices(encoder::Encoder, input_data)
+function get_bucket_indices(encoder::AbstractEncoder, input_data)
     ret_vals = []
     encoders = encoder.encoders
     if encoders !== nothing
@@ -163,7 +181,7 @@ function get_bucket_indices(encoder::Encoder, input_data)
 end
 
 
-function scalars_to_str(encoder::Encoder, scalar_values; scalar_names=nothing)
+function scalars_to_str(encoder::AbstractEncoder, scalar_values; scalar_names=nothing)
     if scalar_names === nothing
         scalar_names = get_scaler_names(encoder)
     end      
@@ -181,7 +199,7 @@ function scalars_to_str(encoder::Encoder, scalar_values; scalar_names=nothing)
 end
 
 
-function get_field_description(encoder::Encoder, field_name)
+function get_field_description(encoder::AbstractEncoder, field_name)
     descritpion = get_description(encoder);
     push!(descritpion, [("end", get_width(encoder))])
 
@@ -203,7 +221,7 @@ function get_field_description(encoder::Encoder, field_name)
 end
 
 
-function encoded_bits_description(encoder::Encoder, bit_offset; formatted=false)
+function encoded_bits_description(encoder::AbstractEncoder, bit_offset; formatted=false)
     (prev_field_name, prev_field_offset) = (nothing, nothing)
     description = get_description(encoder)
     for i in 1:length(description)
@@ -228,7 +246,7 @@ function encoded_bits_description(encoder::Encoder, bit_offset; formatted=false)
 end
 
 
-function pprint_header(encoder::Encoder; prefix="")
+function pprint_header(encoder::AbstractEncoder; prefix="")
     print(prefix)
     description = get_description(encoder) 
     push!(description, [("end", get_width(encoder))])
@@ -248,7 +266,7 @@ function pprint_header(encoder::Encoder; prefix="")
 end
 
 
-function pprint(encoder::Encoder, output; prefix="")
+function pprint(encoder::AbstractEncoder, output; prefix="")
     print(prefix)
     description = get_description(encoder)
     push!(description, [("end", get_width(encoder))])
@@ -261,7 +279,7 @@ function pprint(encoder::Encoder, output; prefix="")
 end
 
 
-function decode(encoder::Encoder, encoded::Union{BitArray, Vector{Int64}, Vector{Float64}}; parent_field_name="")
+function decode(encoder::AbstractEncoder, encoded::Union{BitArray, Vector{Int64}, Vector{Float64}}; parent_field_name="")
     fields_dict = Dict()
     fields_order = []
 
@@ -293,7 +311,7 @@ function decode(encoder::Encoder, encoded::Union{BitArray, Vector{Int64}, Vector
 end
 
 
-function decoded_to_str(encoder::Encoder, decoded_results)
+function decoded_to_str(encoder::AbstractEncoder, decoded_results)
     (fields_dict, fields_order) = decoded_results
 
     desc = ""
@@ -312,7 +330,7 @@ function decoded_to_str(encoder::Encoder, decoded_results)
 end
 
 
-function get_bucket_info(encoder::Encoder, buckets)
+function get_bucket_info(encoder::AbstractEncoder, buckets)
     encoders = encoder.encoders
     if encoders === nothing()
         error("Must be implemented in sub-class")
@@ -342,7 +360,7 @@ function get_bucket_info(encoder::Encoder, buckets)
 end
 
 
-function top_down_compute(encoder::Encoder, encoded)
+function top_down_compute(encoder::AbstractEncoder, encoded)
     encoders = encoder.encoders
     if encoders === nothing()
         error("Must be implemented in sub-class")
@@ -373,7 +391,7 @@ function top_down_compute(encoder::Encoder, encoded)
 end
 
 
-function closeness_scores(encoder::Encoder, exp_values, act_values; fractional=true)
+function closeness_scores(encoder::AbstractEncoder, exp_values, act_values; fractional=true)
     encoders = encoder.encoders
 
     if encoders === nothing
@@ -406,7 +424,7 @@ function closeness_scores(encoder::Encoder, exp_values, act_values; fractional=t
 end
 
 
-function get_display_width(encoder::Encoder)
+function get_display_width(encoder::AbstractEncoder)
     width = get_width(encoder) + length(get_description(encoder)) - 1
     return width
 end

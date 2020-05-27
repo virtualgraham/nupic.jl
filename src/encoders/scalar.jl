@@ -6,9 +6,10 @@ import Base.show
 const DEFAULT_RESOLUTION = 0
 const DEFAULT_RADIUS = 0
 
-abstract type AbstractScalarEncoder <: Encoder end
+abstract type AbstractScalarEncoder <: AbstractEncoder end
 
 mutable struct ScalarEncoder <: AbstractScalarEncoder
+    super::Encoder
     w::Integer
     minval::Union{Float64, Nothing}
     maxval::Union{Float64, Nothing}
@@ -16,11 +17,9 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
     n::Integer
     radius::Float64
     resolution::Float64
-    name::String
     verbosity::Integer
     clip_input::Bool
 
-    encoders
     halfwidth::Integer
     range
     range_internal::Float64
@@ -29,9 +28,6 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
     _top_down_values
     _bucket_values
     padding
-    
-    flattened_field_type_list
-    flattened_encoder_list
 
     function ScalarEncoder(
         w::Integer,
@@ -51,7 +47,6 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             error("Width must be an odd number $w")
         end
 
-        encoders = nothing
         halfwidth = Integer((w-1)/2)
         range = 0
         range_internal = 0
@@ -138,7 +133,10 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             end 
         end
 
+        super = Encoder(name)
+
         return new(
+            super,
             w,
             minval,
             maxval,
@@ -146,10 +144,8 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             n,
             radius,
             resolution,
-            name,
             verbosity,
             clip_input,
-            encoders,
             halfwidth,
             range,
             range_internal,
@@ -157,9 +153,7 @@ mutable struct ScalarEncoder <: AbstractScalarEncoder
             _top_down_mapping_m,
             _top_down_values,
             _bucket_values,
-            padding,
-            nothing,
-            nothing
+            padding
         )
     end
 end

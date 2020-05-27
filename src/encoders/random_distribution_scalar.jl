@@ -1,3 +1,5 @@
-mutable struct RandomDistributedScalarEncoder <: Encoder
+abstract type AbstractRandomDistributedScalarEncoder <: AbstractEncoder end
+
+mutable struct RandomDistributedScalarEncoder <: AbstractRandomDistributedScalarEncoder
 
 end

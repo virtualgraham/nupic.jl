@@ -1,4 +1,4 @@
-abstract type AbstractPassThroughEncoder <: Encoder end
+abstract type AbstractPassThroughEncoder <: AbstractEncoder end
 
 mutable struct PassThroughEncoder <: AbstractPassThroughEncoder
 

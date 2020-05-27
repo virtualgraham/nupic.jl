@@ -1,10 +1,10 @@
-abstract type AbstractCategoryEncoder <: Encoder end
+abstract type AbstractCategoryEncoder <: AbstractEncoder end
 
 const UNKNOWN = "<UNKNOWN>"
 const MISSING = "<missing>"
 
 mutable struct CategoryEncoder <: AbstractCategoryEncoder
-    encoders
+    super::Encoder
     verbosity::Integer
     ncategories::Integer
     category_to_index
@@ -12,11 +12,8 @@ mutable struct CategoryEncoder <: AbstractCategoryEncoder
     encoder::ScalarEncoder
     width::Integer
     description
-    name::String
     _top_down_mapping_m
     _bucket_values
-    flattened_field_type_list
-    flattened_encoder_list
 
     function CategoryEncoder(
         w,
@@ -25,8 +22,6 @@ mutable struct CategoryEncoder <: AbstractCategoryEncoder
         verbosity=0,
         forced=false
     )
-
-        encoders = nothing
         ncategories = length(category_list) + 1
         category_to_index = Dict()
         index_to_category = Dict(1 => UNKNOWN)
@@ -39,8 +34,10 @@ mutable struct CategoryEncoder <: AbstractCategoryEncoder
         @assert get_width(encoder) == width
         description = [(name, 0)]
             
+        super = Encoder(name)
+        
         return new(
-            encoders,
+            super,
             verbosity,
             ncategories,
             category_to_index,
@@ -48,9 +45,6 @@ mutable struct CategoryEncoder <: AbstractCategoryEncoder
             encoder,
             width,
             description,
-            name,
-            nothing,
-            nothing,
             nothing,
             nothing
         )
