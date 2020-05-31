@@ -53,7 +53,7 @@ end
 
 
 get_decoder_output_field_types(encoder::AbstractCategoryEncoder) = (Integer,)
-get_width(encoder::AbstractCategoryEncoder) = encoder.width
+get_width(encoder::AbstractCategoryEncoder) = encoder.width 
 get_description(encoder::AbstractCategoryEncoder) = encoder.description
 
 
@@ -75,7 +75,7 @@ function get_bucket_indices(encoder::AbstractCategoryEncoder, input; learn=nothi
 end
 
 
-function encode_into_array(encoder::AbstractCategoryEncoder, input, output::BitArray; learn=nothing)
+function encode_into_array(encoder::AbstractCategoryEncoder, input, output::AbstractArray{Bool}; learn=nothing)
     if input === nothing
         output[1,:] .= 0
         val = MISSING
@@ -91,7 +91,7 @@ function encode_into_array(encoder::AbstractCategoryEncoder, input, output::BitA
 end
 
 
-function decode(encoder::AbstractCategoryEncoder, encoded::Union{BitArray, Vector{Int64}, Vector{Float64}}; parent_field_name="")
+function decode(encoder::AbstractCategoryEncoder, encoded::AbstractArray{<:Real}; parent_field_name="")
     fields_dict, field_names = decode(encoder.encoder, encoded)
     if length(fields_dict) == 0
         return fields_dict, field_names

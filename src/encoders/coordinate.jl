@@ -29,7 +29,7 @@ get_description(encoder::AbstractCoordinateEncoder) = [("coordinate", 0), ("radi
 get_scalars(encoder::AbstractCoordinateEncoder, input_data) = zeros(length(input_data))
 
 
-function encode_into_array(encoder::AbstractCategoryEncoder, input, output::BitArray; learn=nothing)
+function encode_into_array(encoder::AbstractCoordinateEncoder, input, output::AbstractArray{Bool}; learn=nothing)
 
 end
 

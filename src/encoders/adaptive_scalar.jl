@@ -122,7 +122,7 @@ function get_bucket_indices(encoder::AbstractAdaptiveScalarEncoder, input; learn
 end
 
 
-function encode_into_array(encoder::AbstractAdaptiveScalarEncoder, input, output::BitArray; learn=nothing)
+function encode_into_array(encoder::AbstractAdaptiveScalarEncoder, input, output::AbstractArray{Bool}; learn=nothing)
     encoder.record_num += 1
     if learn === nothing
         learn = encoder.learning_enabled

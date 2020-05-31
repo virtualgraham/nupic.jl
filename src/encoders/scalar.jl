@@ -160,7 +160,7 @@ end
 
 
 get_decoder_output_field_types(encoder::AbstractScalarEncoder) = (Float64,)
-get_width(encoder::AbstractScalarEncoder) = encoder.n
+get_width(encoder::AbstractScalarEncoder) = encoder.n 
 get_description(encoder::AbstractScalarEncoder) = [(encoder.name, 0)]
 
 
@@ -243,7 +243,7 @@ function get_bucket_indices(encoder::AbstractScalarEncoder, input; learn=nothing
 end
 
 
-function encode_into_array(encoder::AbstractScalarEncoder, input, output::BitArray; learn=nothing)
+function encode_into_array(encoder::AbstractScalarEncoder, input, output::AbstractArray{Bool}; learn=nothing)
     if input !== nothing && isnan(input) 
         input = nothing 
     end
@@ -293,37 +293,17 @@ function encode_into_array(encoder::AbstractScalarEncoder, input, output::BitArr
 end
 
 
-function decode(encoder::AbstractScalarEncoder, encoded::Union{Vector{Int64}, Vector{Float64}}; parent_field_name="")
-    tmp_output = BitArray( encoded[1:encoder.n] .> 0 )
-
-    if !any(x->x>0, tmp_output)
-        return Dict(), []
-    end
-
-    if encoder.verbosity >= 2
-        println("raw output: $(encoded[1:encoder.n])")
-    end
-
-    return _decode(encoder, tmp_output; parent_field_name=parent_field_name)
-end
-
-
-function decode(encoder::AbstractScalarEncoder, encoded::BitArray; parent_field_name="")
+function decode(encoder::AbstractScalarEncoder, encoded::AbstractArray{<:Real}; parent_field_name="")
     if !any(x->x>0, encoded)
         return Dict(), []
     end
 
-    tmp_output = copy(encoded)
+    tmp_output = BitArray( encoded[1:encoder.n] .> 0 )
 
     if encoder.verbosity >= 2
         println("raw output: $(encoded[1:encoder.n])")
     end
-    
-    return _decode(encoder, tmp_output; parent_field_name=parent_field_name)
-end
 
-
-function _decode(encoder::AbstractScalarEncoder, tmp_output::BitArray; parent_field_name="")
     max_zeros_in_a_row = encoder.halfwidth
     for i in 1:max_zeros_in_a_row 
         search_str = ones(i + 2)
@@ -460,7 +440,7 @@ function _get_top_down_mapping!(encoder::AbstractScalarEncoder)
         num_categories = length(encoder._top_down_values)
         encoder._top_down_mapping_m = spzeros(num_categories, encoder.n)
 
-        output_space = BitArray(undef, encoder.n)
+        output_space = BitArray(Iterators.repeated(0, encoder.n))
         for i in 1:num_categories 
             value = encoder._top_down_values[i]
             value = max(value, encoder.minval)

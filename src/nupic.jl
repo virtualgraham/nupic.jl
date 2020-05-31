@@ -5,7 +5,7 @@ include("object.jl")
 include("encoders/base.jl")
 
 # encoders
-export Encoder, ScalarEncoder, AdaptiveScalarEncoder, DeltaEncoder, CategoryEncoder
+export Encoder, ScalarEncoder, AdaptiveScalarEncoder, DeltaEncoder, CategoryEncoder, DateEncoder, Days
 
 export get_width, encode_into_array, encode, get_scaler_names, 
     get_decoder_output_field_types, get_encoder_list, get_scalars, get_encoded_values, 

@@ -60,7 +60,7 @@ end
 
 
 
-function encode_into_array(encoder::AbstractDeltaEncoder, input, output::BitArray; learn=nothing)
+function encode_into_array(encoder::AbstractDeltaEncoder, input, output::AbstractArray{Bool}; learn=nothing)
     if learn === nothing
         learn = encoder.learning_enabled
     end

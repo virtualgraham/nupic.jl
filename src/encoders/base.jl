@@ -41,17 +41,17 @@ end
 # encode_into_array(encoder::AbstractEncoder, input_data, output::BitArray; learn=true) = error("Encoder method encode_into_array not implemented")
 
 
-function encode(encoder::AbstractEncoder, input_data)
-    output = BitArray(undef, get_width(encoder))
-    encode_into_array(encoder, input_data, output)
+function encode(this::AbstractEncoder, input_data)
+    output = BitArray(Iterators.repeated(0, get_width(this)))
+    encode_into_array(this, input_data, output)
     return output
 end
 
 
-function get_scaler_names(encoder::AbstractEncoder; parent_field_name="") 
+function get_scaler_names(this::AbstractEncoder; parent_field_name="") 
     names = String[]
 
-    encoders = encoder.encoders
+    encoders = this.encoders
 
     if encoders !== nothing        
         for (name, encoder, offset) in encoders
@@ -64,7 +64,7 @@ function get_scaler_names(encoder::AbstractEncoder; parent_field_name="")
         if parent_field_name != ""
             push!(names, parent_field_name)
         else 
-            push!(names, encoder.name)
+            push!(names, this.name)
         end
     end
 
@@ -72,8 +72,8 @@ function get_scaler_names(encoder::AbstractEncoder; parent_field_name="")
 end
 
 
-function get_decoder_output_field_types(encoder::AbstractEncoder) 
-    flattened_field_type_list = encoder.flattened_field_type_list
+function get_decoder_output_field_types(this::AbstractEncoder) 
+    flattened_field_type_list = this.flattened_field_type_list
 
     if flattened_field_type_list !== nothing
         return flattened_field_type_list
@@ -81,21 +81,21 @@ function get_decoder_output_field_types(encoder::AbstractEncoder)
 
     field_types = []
 
-    encoders = encoder.encoders
+    encoders = this.encoders
 
     for (name, encoder, offset) in encoders
         sub_types = get_decoder_output_field_types(encoder)
         append!(encoders, sub_types)
     end
 
-    encoder.flattened_field_type_list = field_types
+    this.flattened_field_type_list = field_types
 
     return field_types
 end
 
 
-function get_encoder_list(encoder::AbstractEncoder)
-    flattened_encoder_list = encoder.flattened_encoder_list
+function get_encoder_list(this::AbstractEncoder)
+    flattened_encoder_list = this.flattened_encoder_list
 
     if flattened_encoder_list !== nothing
         return flattened_encoder_list
@@ -103,7 +103,7 @@ function get_encoder_list(encoder::AbstractEncoder)
 
     encoders = []
 
-    encoders = encoder.encoders
+    encoders = this.encoders
 
     if encoders !== nothing
         for (name, encoder, offset) in encoders
@@ -111,17 +111,17 @@ function get_encoder_list(encoder::AbstractEncoder)
             append!(encoders, sub_encoders)
         end
     else
-        push!(encoders, encoder)
+        push!(encoders, this)
     end
 
-    encoder.flattened_encoder_list = encoders
+    this.flattened_encoder_list = encoders
 
     return encoders
 end
 
 
-function get_scalars(encoder::AbstractEncoder, input_data)
-    encoders = encoder.encoders
+function get_scalars(this::AbstractEncoder, input_data)
+    encoders = this.encoders
 
     if encoders !== nothing
         ret_vals = []
@@ -139,10 +139,10 @@ function get_scalars(encoder::AbstractEncoder, input_data)
 end
 
 
-function get_encoded_values(encoder::AbstractEncoder, input_data)
+function get_encoded_values(this::AbstractEncoder, input_data)
     ret_vals = []
 
-    encoders = encoder.encoders
+    encoders = this.encoders
 
     if encoders !== nothing 
         for (name, encoder, offset) in encoders
@@ -165,9 +165,10 @@ function get_encoded_values(encoder::AbstractEncoder, input_data)
 end
 
 
-function get_bucket_indices(encoder::AbstractEncoder, input_data)
+function get_bucket_indices(this::AbstractEncoder, input_data)
+    println("AbstractEncoder get_bucket_indices")
     ret_vals = []
-    encoders = encoder.encoders
+    encoders = this.encoders
     if encoders !== nothing
         for (name, encoder, offset) in encoders
             values = get_bucket_indices(encoder, input_data[name])
@@ -181,9 +182,9 @@ function get_bucket_indices(encoder::AbstractEncoder, input_data)
 end
 
 
-function scalars_to_str(encoder::AbstractEncoder, scalar_values; scalar_names=nothing)
+function scalars_to_str(this::AbstractEncoder, scalar_values; scalar_names=nothing)
     if scalar_names === nothing
-        scalar_names = get_scaler_names(encoder)
+        scalar_names = get_scaler_names(this)
     end      
 
     desc = ""
@@ -199,9 +200,9 @@ function scalars_to_str(encoder::AbstractEncoder, scalar_values; scalar_names=no
 end
 
 
-function get_field_description(encoder::AbstractEncoder, field_name)
-    descritpion = get_description(encoder);
-    push!(descritpion, [("end", get_width(encoder))])
+function get_field_description(this::AbstractEncoder, field_name)
+    descritpion = get_description(this);
+    push!(descritpion, [("end", get_width(this))])
 
     (i, offset) = (() -> begin
         for i in 1:length(descritpion)
@@ -221,9 +222,9 @@ function get_field_description(encoder::AbstractEncoder, field_name)
 end
 
 
-function encoded_bits_description(encoder::AbstractEncoder, bit_offset; formatted=false)
+function encoded_bits_description(this::AbstractEncoder, bit_offset; formatted=false)
     (prev_field_name, prev_field_offset) = (nothing, nothing)
-    description = get_description(encoder)
+    description = get_description(this)
     for i in 1:length(description)
         (name, offset) = description[i]
         if formatted
@@ -236,9 +237,9 @@ function encoded_bits_description(encoder::AbstractEncoder, bit_offset; formatte
         end
     end
 
-    width = if formatted get_display_width(encoder) else get_width(encoder) end
+    width = if formatted get_display_width(this) else get_width(this) end
 
-    if prev_field_offset === nothing || bit_offset > get_width(encoder)
+    if prev_field_offset === nothing || bit_offset > get_width(this)
         error("Bit is outside of allowable range: [0 - $width]")
     end
 
@@ -246,10 +247,10 @@ function encoded_bits_description(encoder::AbstractEncoder, bit_offset; formatte
 end
 
 
-function pprint_header(encoder::AbstractEncoder; prefix="")
+function pprint_header(this::AbstractEncoder; prefix="")
     print(prefix)
-    description = get_description(encoder) 
-    push!(description, [("end", get_width(encoder))])
+    description = get_description(this) 
+    push!(description, [("end", get_width(this))])
     for i in 1:(length(description)-1)
         name = description[i][1]
         width = description[i+1][2] - description[i][2]
@@ -262,14 +263,14 @@ function pprint_header(encoder::AbstractEncoder; prefix="")
         @eval @printf($format_str, $(pname))
     end
     print(" ")
-    print("$prefix " * '-'^(get_width(encoder) + (length(description) - 1)*3 - 1))
+    print("$prefix " * '-'^(get_width(this) + (length(description) - 1)*3 - 1))
 end
 
 
-function pprint(encoder::AbstractEncoder, output; prefix="")
+function pprint(this::AbstractEncoder, output; prefix="")
     print(prefix)
-    description = get_description(encoder)
-    push!(description, [("end", get_width(encoder))])
+    description = get_description(this)
+    push!(description, [("end", get_width(this))])
     for i in 1:length(description)-1
         offset = description[i][2]
         nextoffset = description[i+1][2]
@@ -279,28 +280,30 @@ function pprint(encoder::AbstractEncoder, output; prefix="")
 end
 
 
-function decode(encoder::AbstractEncoder, encoded::Union{BitArray, Vector{Int64}, Vector{Float64}}; parent_field_name="")
+function decode(this::AbstractEncoder, encoded::AbstractArray{<:Real}; parent_field_name="")
     fields_dict = Dict()
     fields_order = []
 
     if parent_field_name == ""
-        parent_name = encoder.name
+        parent_name = this.name
     else
-        parent_name = "$parent_field_name.$(encoder.name)"
+        parent_name = "$parent_field_name.$(this.name)"
     end
 
-    encoders = encoder.encoders
+    encoders = this.encoders
 
     if encoders !== nothing
         for i in 1:length(encoders)
-            (name, encoder, offset) = encoders[i]
+            (name, encoder_, offset) = encoders[i]
+            
             if i < length(encoders)
                 next_offset = encoders[i+1][3]
             else
-                next_offset = get_width(encoder)
+                next_offset = get_width(this)
             end
-            field_output = encoded[offset:next_offset]
-            (sub_fields_dict, sub_fields_order) = decode(encoder, field_output; parent_field_name=parent_name)
+
+            field_output = view(encoded, offset:next_offset)
+            (sub_fields_dict, sub_fields_order) = decode(encoder_, field_output; parent_field_name=parent_name)
 
             merge!(fields_dict, sub_fields_dict)
             append!(fields_order, sub_fields_order)
@@ -311,7 +314,7 @@ function decode(encoder::AbstractEncoder, encoded::Union{BitArray, Vector{Int64}
 end
 
 
-function decoded_to_str(encoder::AbstractEncoder, decoded_results)
+function decoded_to_str(this::AbstractEncoder, decoded_results)
     (fields_dict, fields_order) = decoded_results
 
     desc = ""
@@ -330,25 +333,25 @@ function decoded_to_str(encoder::AbstractEncoder, decoded_results)
 end
 
 
-function get_bucket_info(encoder::AbstractEncoder, buckets)
-    encoders = encoder.encoders
-    if encoders === nothing()
+function get_bucket_info(this::AbstractEncoder, buckets)
+    encoders = this.encoders
+    if encoders === nothing
         error("Must be implemented in sub-class")
     end
 
     ret_vals = []
-    bucket_offset = 0
-    encoders = encoder.encoders
+    bucket_offset = 1
+    encoders = this.encoders
     for i in 1:length(encoders)
         (name, encoder, offset) = encoders[i]
         
-        if encoders !== nothing
-            next_bucket_offset = bucket_offset + length(encoders)
+        if encoder.encoders !== nothing
+            next_bucket_offset = bucket_offset + length(encoder.encoders)
         else
             next_bucket_offset = bucket_offset + 1
         end
 
-        bucket_indices = buckets[bucket_offset:next_bucket_offset]
+        bucket_indices = buckets[bucket_offset:next_bucket_offset-1]
         values = get_bucket_info(encoder, bucket_indices)
 
         append!(ret_vals, values)
@@ -360,24 +363,24 @@ function get_bucket_info(encoder::AbstractEncoder, buckets)
 end
 
 
-function top_down_compute(encoder::AbstractEncoder, encoded)
-    encoders = encoder.encoders
-    if encoders === nothing()
+function top_down_compute(this::AbstractEncoder, encoded)
+    encoders = this.encoders
+    if encoders === nothing
         error("Must be implemented in sub-class")
     end
 
     ret_vals = []
-    encoders = encoder.encoders
+    encoders = this.encoders
     for i in 1:length(encoders)
-        (name, encoder, offset) = encoders[i]
+        name, encoder, offset = encoders[i]
 
-        if i < length(encoders) - 1
-            next_offset = encoders[i+1][3]
+        if i < length(encoders)
+            next_offset = encoders[i+1][3] 
         else
-            next_offset = get_width(encoder)
+            next_offset = get_width(this) + 1
         end
 
-        field_output = encoded[offset:next_offset]
+        field_output = encoded[offset:next_offset - 1]
         values = top_down_compute(encoder, field_output)
 
         if values isa Dict
@@ -391,8 +394,8 @@ function top_down_compute(encoder::AbstractEncoder, encoded)
 end
 
 
-function closeness_scores(encoder::AbstractEncoder, exp_values, act_values; fractional=true)
-    encoders = encoder.encoders
+function closeness_scores(this::AbstractEncoder, exp_values, act_values; fractional=true)
+    encoders = this.encoders
 
     if encoders === nothing
         err = abs(exp_values[1] - act_values[1])
@@ -414,8 +417,8 @@ function closeness_scores(encoder::AbstractEncoder, exp_values, act_values; frac
 
     scalar_idx = 1
     ret_vals = []
-    for (name, encoder, offset) in encoders
-        values = closeness_scores(encoder, exp_values[scalar_idx], act_values[scalar_idx], fractional=fractional)
+    for (name, encoder_, offset) in encoders
+        values = closeness_scores(encoder_, exp_values[scalar_idx], act_values[scalar_idx], fractional=fractional)
         scalar_idx += length(values)
         ret_values = hcat(ret_vals, values)
     end
@@ -424,8 +427,8 @@ function closeness_scores(encoder::AbstractEncoder, exp_values, act_values; frac
 end
 
 
-function get_display_width(encoder::AbstractEncoder)
-    width = get_width(encoder) + length(get_description(encoder)) - 1
+function get_display_width(this::AbstractEncoder)
+    width = get_width(this) + length(get_description(this)) - 1
     return width
 end
 
