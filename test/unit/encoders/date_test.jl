@@ -128,11 +128,10 @@ using Dates
             d = d + Dates.Day(1)
             @test encode(e, d) == encode(e2, d)
 
-            println(decode(mon, encode(mon, d)))
             if decode(mon, encode(mon, d))[1]["Monday"][1][1][1] == 1.0
-                @test Dates.dayofweek(d) <= 5
+                @test Dates.dayofweek(d) == 1
             else 
-                @test Dates.dayofweek(d) >= 6
+                @test Dates.dayofweek(d) != 1
             end
         end
     end
